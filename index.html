@@ -39,16 +39,16 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-center">
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4 text-center">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
                 <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Total do Mês</p>
                 <p id="totalGeral" class="text-xl font-black text-slate-700">R$ 0,00</p>
             </div>
-            <div class="bg-emerald-50 p-4 rounded-2xl shadow-sm border border-emerald-100 text-center">
+            <div class="bg-emerald-50 p-4 rounded-2xl shadow-sm border border-emerald-100">
                 <p class="text-[10px] text-emerald-600 font-bold uppercase mb-1">Total Pago</p>
                 <p id="totalPago" class="text-xl font-black text-emerald-700">R$ 0,00</p>
             </div>
-            <div class="bg-rose-50 p-4 rounded-2xl shadow-sm border border-rose-100 text-center">
+            <div class="bg-rose-50 p-4 rounded-2xl shadow-sm border border-rose-100">
                 <p class="text-[10px] text-rose-600 font-bold uppercase mb-1">Pendente</p>
                 <p id="totalRestante" class="text-xl font-black text-rose-700">R$ 0,00</p>
             </div>
@@ -57,7 +57,12 @@
         <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
             <div class="flex justify-between items-center mb-4">
                 <h2 id="formTitulo" class="font-bold text-slate-700 uppercase text-xs tracking-wider italic">Novo Lançamento</h2>
-                <button onclick="cancelarEdicao()" id="btnCancelarEdicao" class="hidden text-rose-500 text-[10px] font-bold uppercase hover:underline">Cancelar Edição</button>
+                <div class="flex gap-2 items-center">
+                    <label class="text-[10px] font-bold uppercase text-slate-400 flex items-center gap-1 cursor-pointer">
+                        <input type="checkbox" id="checkFixa" class="rounded"> Fixa?
+                    </label>
+                    <button onclick="cancelarEdicao()" id="btnCancelarEdicao" class="hidden text-rose-500 text-[10px] font-bold uppercase hover:underline">Cancelar</button>
+                </div>
             </div>
 
             <input type="hidden" id="editId">
@@ -65,13 +70,13 @@
             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
                 <input type="number" id="valor" placeholder="R$ Valor" class="border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                <input type="number" id="vencimentoDia" placeholder="Dia" min="1" max="31" class="border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
-                <button onclick="salvarLancamento()" id="btnSalvar" class="bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition text-sm shadow-md uppercase">Salvar</button>
+                <input type="number" id="vencimentoDia" placeholder="Dia" class="border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <button onclick="salvarLancamento()" id="btnSalvar" class="bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition shadow-md uppercase">Salvar</button>
             </div>
         </div>
 
         <div id="listaContainer" class="space-y-3 pb-12">
-            <p class="text-center text-slate-400 text-xs font-bold uppercase py-10 tracking-widest">Sincronizando...</p>
+            <p class="text-center text-slate-400 text-xs font-bold uppercase py-10">Sincronizando...</p>
         </div>
     </div>
 
@@ -85,13 +90,9 @@
 
         async function buscarDados() {
             const mesRef = document.getElementById('filtroMes').value;
-            // Busca todos para processamento local (mais estável para o GitHub Pages)
             const { data, error } = await supabaseClient.from('despesas').select('*');
-
-            if (error) {
-                console.error("Erro:", error);
-                // Evitamos o alert aqui para o app não travar se o banco estiver vazio
-            } else {
+            if (error) console.error(error);
+            else {
                 despesasDoMes = (data || []).filter(d => d.vencimento.startsWith(mesRef));
                 renderizar();
             }
@@ -99,18 +100,16 @@
 
         async function salvarLancamento() {
             const id = document.getElementById('editId').value;
-            const nome = document.getElementById('nome').value.trim();
-            const valor = parseFloat(document.getElementById('valor').value) || 0;
+            const nome = document.getElementById('nome').value;
+            const valor = parseFloat(document.getElementById('valor').value);
             const dia = document.getElementById('vencimentoDia').value;
+            const fixa = document.getElementById('checkFixa').checked;
             const mesRef = document.getElementById('filtroMes').value;
+            const dataVenc = `${mesRef}-${dia.padStart(2, '0')}`;
 
-            if (!nome || !dia) return alert("Preencha descrição e dia!");
+            if (!nome || !valor || !dia) return alert("Preencha os campos!");
 
-            const payload = {
-                nome,
-                valor,
-                vencimento: `${mesRef}-${String(dia).padStart(2, '0')}`
-            };
+            const payload = { nome, valor, vencimento: dataVenc, fixa };
 
             let res;
             if (id) {
@@ -129,6 +128,7 @@
             document.getElementById('nome').value = item.nome;
             document.getElementById('valor').value = item.valor;
             document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
+            document.getElementById('checkFixa').checked = item.fixa || false;
             
             document.getElementById('formTitulo').innerText = "Editando Registro";
             document.getElementById('btnSalvar').innerText = "Atualizar";
@@ -141,6 +141,7 @@
             document.getElementById('nome').value = '';
             document.getElementById('valor').value = '';
             document.getElementById('vencimentoDia').value = '';
+            document.getElementById('checkFixa').checked = false;
             document.getElementById('formTitulo').innerText = "Novo Lançamento";
             document.getElementById('btnSalvar').innerText = "Salvar";
             document.getElementById('btnCancelarEdicao').classList.add('hidden');
@@ -152,7 +153,7 @@
         }
 
         async function remover(id) {
-            if (confirm("Excluir permanentemente?")) {
+            if (confirm("Excluir?")) {
                 await supabaseClient.from('despesas').delete().eq('id', id);
                 buscarDados();
             }
@@ -160,30 +161,24 @@
 
         function renderizar() {
             const container = document.getElementById('listaContainer');
-            container.innerHTML = despesasDoMes.length === 0 ? '<p class="text-center text-slate-400 py-10 italic">Nenhum registro encontrado.</p>' : '';
+            container.innerHTML = despesasDoMes.length === 0 ? '<p class="text-center text-slate-400 py-10">Vazio.</p>' : '';
             
             let totalG = 0, totalP = 0;
             despesasDoMes.sort((a,b) => a.vencimento.localeCompare(b.vencimento)).forEach((item, index) => {
-                totalG += item.valor;
-                if(item.paga) totalP += item.valor;
-
+                totalG += item.valor; if(item.paga) totalP += item.valor;
                 const dia = item.vencimento.split('-')[2];
                 const div = document.createElement('div');
-                div.className = `p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all ${item.paga ? 'bg-slate-50 border-slate-200 opacity-70' : 'bg-white border-white shadow-sm hover:shadow-md'}`;
+                div.className = `p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white shadow-sm ${item.paga ? 'opacity-60 grayscale-[0.5]' : ''}`;
                 
                 div.innerHTML = `
-                    <div class="flex flex-col flex-1 cursor-pointer group" onclick="editarItem(${index})">
-                        <div class="flex items-center gap-2">
-                            <span class="font-bold text-slate-800 text-lg group-hover:text-blue-600 transition">${item.nome}</span>
-                            ${item.fixa ? '<span class="fixo-tag">Fixo</span>' : ''}
-                            <span class="text-[10px] text-blue-400 opacity-0 group-hover:opacity-100 transition">✎ editar</span>
-                        </div>
-                        <span class="text-[11px] text-slate-500 font-bold uppercase tracking-tighter">Vencimento: Dia ${dia} • <span class="text-blue-600">R$ ${item.valor.toLocaleString('pt-br', {minimumFractionDigits: 2})}</span></span>
+                    <div class="flex-1 cursor-pointer" onclick="editarItem(${index})">
+                        <p class="font-bold text-slate-800">${item.nome} ${item.fixa ? '<span class="fixo-tag">Fixo</span>' : ''}</p>
+                        <p class="text-[11px] text-slate-500 font-bold uppercase">Dia ${dia} • R$ ${item.valor.toFixed(2).replace('.',',')}</p>
                     </div>
                     <div class="flex items-center gap-2">
-                        <button onclick="alternarStatus('${item.id}', false)" class="text-[10px] font-black px-4 py-2.5 rounded-xl border transition-all ${!item.paga ? 'btn-aberto shadow-md' : 'bg-white text-slate-300 border-slate-100 hover:text-red-400'}">ABERTO</button>
-                        <button onclick="alternarStatus('${item.id}', true)" class="text-[10px] font-black px-4 py-2.5 rounded-xl border transition-all ${item.paga ? 'btn-pago shadow-md' : 'bg-white text-slate-300 border-slate-100 hover:text-emerald-400'}">PAGO</button>
-                        <button onclick="remover('${item.id}')" class="ml-2 text-slate-300 hover:text-red-500 px-2">✕</button>
+                        <button onclick="alternarStatus('${item.id}', false)" class="text-[10px] font-black px-4 py-2.5 rounded-xl border ${!item.paga ? 'btn-aberto shadow-md' : 'bg-white text-slate-300'}">ABERTO</button>
+                        <button onclick="alternarStatus('${item.id}', true)" class="text-[10px] font-black px-4 py-2.5 rounded-xl border ${item.paga ? 'btn-pago shadow-md' : 'bg-white text-slate-300'}">PAGO</button>
+                        <button onclick="remover('${item.id}')" class="ml-2 text-slate-300 hover:text-red-500 px-2 font-bold">✕</button>
                     </div>`;
                 container.appendChild(div);
             });
@@ -195,7 +190,6 @@
             document.getElementById('totalPago').innerText = `R$ ${totalP.toLocaleString('pt-br', {minimumFractionDigits: 2})}`;
             document.getElementById('totalRestante').innerText = `R$ ${(totalG - totalP).toLocaleString('pt-br', {minimumFractionDigits: 2})}`;
         }
-
         buscarDados();
     </script>
 </body>
