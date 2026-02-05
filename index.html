@@ -1,0 +1,251 @@
+<!DOCTYPE html>
+<html lang="pt-br">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Controle Financeiro Pro</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .btn-pago { background-color: #10b981 !important; color: white; border-color: #10b981; }
+        .btn-aberto { background-color: #ef4444 !important; color: white; border-color: #ef4444; }
+        .fixo-tag { background-color: #eff6ff; color: #1d4ed8; font-size: 9px; padding: 2px 8px; border-radius: 999px; text-transform: uppercase; font-weight: 800; border: 1px solid #dbeafe; }
+        .progress-bar { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
+    </style>
+</head>
+<body class="bg-slate-100 min-h-screen p-4 font-sans text-slate-900">
+
+    <div class="max-w-2xl mx-auto space-y-6">
+        
+        <div class="bg-white rounded-2xl shadow-sm p-6 flex flex-col md:flex-row justify-between items-center gap-4 border-b-4 border-blue-600">
+            <div>
+                <h1 class="text-2xl font-black tracking-tight text-slate-800">Checklist de Contas</h1>
+                <p class="text-sm text-slate-500 font-medium italic">Sincronizado com Supabase</p>
+            </div>
+            <div class="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                <span class="text-[10px] font-bold text-slate-400 uppercase ml-2">Mês Ref.</span>
+                <input type="month" id="filtroMes" onchange="buscarDados()" class="bg-transparent font-bold text-blue-600 focus:outline-none cursor-pointer">
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase">Progresso de Pagamento</span>
+                <span id="porcentagemTexto" class="text-[10px] font-bold text-blue-600 uppercase">0%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2.5">
+                <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full progress-bar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-center">
+                <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Total do Mês</p>
+                <p id="totalGeral" class="text-xl font-black text-slate-700">R$ 0,00</p>
+            </div>
+            <div class="bg-emerald-50 p-4 rounded-2xl shadow-sm border border-emerald-100 text-center">
+                <p class="text-[10px] text-emerald-600 font-bold uppercase mb-1">Total Pago</p>
+                <p id="totalPago" class="text-xl font-black text-emerald-700">R$ 0,00</p>
+            </div>
+            <div class="bg-rose-50 p-4 rounded-2xl shadow-sm border border-rose-100 text-center">
+                <p class="text-[10px] text-rose-600 font-bold uppercase mb-1">Pendente</p>
+                <p id="totalRestante" class="text-xl font-black text-rose-700">R$ 0,00</p>
+            </div>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="formTitulo" class="font-bold text-slate-700 uppercase text-xs tracking-wider italic">Novo Lançamento</h2>
+                <button onclick="cancelarEdicao()" id="btnCancelarEdicao" class="hidden text-rose-500 text-[10px] font-bold uppercase hover:underline">Cancelar Edição</button>
+            </div>
+
+            <input type="hidden" id="editId">
+            
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <div class="md:col-span-1">
+                    <input type="text" id="nome" placeholder="Descrição" class="w-full border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                </div>
+                <input type="number" id="valor" placeholder="R$ Valor" class="border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <input type="number" id="vencimentoDia" placeholder="Dia" min="1" max="31" class="border rounded-xl px-4 py-2.5 text-sm focus:ring-2 focus:ring-blue-500 outline-none">
+                <button onclick="salvarLancamento()" id="btnSalvar" class="bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition text-sm shadow-md uppercase tracking-tight">Salvar</button>
+            </div>
+        </div>
+
+        <div id="listaContainer" class="space-y-3 pb-12">
+            <div class="text-center py-10">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p class="text-slate-400 text-xs mt-2 font-bold uppercase">Sincronizando...</p>
+            </div>
+        </div>
+
+    </div>
+
+
+
+
+    <script>
+      // === CONFIGURAÇÃO DO SUPABASE ===
+const _URL = "https://hzfjdtpllocdbeqsxhly.supabase.co"; 
+const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6ZmpkdHBsbG9jZGJlcXN4aGx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyOTkxOTYsImV4cCI6MjA4NTg3NTE5Nn0.-4mugGyPB6ozbtTSgjRd_buHea3m9rf-yRnxz7BY6CA";
+
+// Verificação de segurança: garante que as variáveis existem antes de criar o cliente
+if (_URL.includes("SUA_") || _KEY.includes("SUA_")) {
+    alert("Atenção: Você ainda não substituiu as chaves corretamente no código.");
+}
+
+const supabaseClient = supabase.createClient(_URL, _KEY);
+
+        let despesasDoMes = [];
+
+        // INICIALIZAÇÃO: Define o mês atual no filtro
+        const hoje = new Date();
+        document.getElementById('filtroMes').value = hoje.toISOString().substring(0, 7);
+
+        // BUSCAR DADOS DO BANCO
+        async function buscarDados() {
+            const mesRef = document.getElementById('filtroMes').value;
+            
+            // Filtra no banco apenas as datas que começam com o "YYYY-MM" selecionado
+            const { data, error } = await supabaseClient
+                .from('despesas')
+                .select('*')
+                .filter('vencimento', 'gte', `${mesRef}-01`)
+                .filter('vencimento', 'lte', `${mesRef}-31`)
+                .order('vencimento', { ascending: true });
+
+            if (error) {
+                console.error("Erro ao buscar:", error);
+                alert("Erro ao conectar com o banco de dados.");
+            } else {
+                despesasDoMes = data;
+                renderizar();
+            }
+        }
+
+        // SALVAR OU ATUALIZAR
+        async function salvarLancamento() {
+            const id = document.getElementById('editId').value;
+            const nome = document.getElementById('nome').value.trim();
+            const valor = parseFloat(document.getElementById('valor').value) || 0;
+            const dia = parseInt(document.getElementById('vencimentoDia').value);
+            const mesRef = document.getElementById('filtroMes').value;
+
+            if (!nome || isNaN(dia) || dia < 1 || dia > 31) {
+                alert("Por favor, preencha a descrição e um dia válido (1 a 31).");
+                return;
+            }
+
+            const payload = {
+                nome,
+                valor,
+                vencimento: `${mesRef}-${String(dia).padStart(2, '0')}`
+            };
+
+            let resultado;
+            if (id) {
+                // Modo Edição
+                resultado = await supabaseClient.from('despesas').update(payload).eq('id', id);
+            } else {
+                // Modo Novo Lançamento
+                resultado = await supabaseClient.from('despesas').insert([payload]);
+            }
+
+            if (resultado.error) {
+                alert("Erro ao salvar dados.");
+            } else {
+                cancelarEdicao();
+                buscarDados();
+            }
+        }
+
+        // PREPARAR EDIÇÃO
+        function editarItem(index) {
+            const item = despesasDoMes[index];
+            document.getElementById('editId').value = item.id;
+            document.getElementById('nome').value = item.nome;
+            document.getElementById('valor').value = item.valor;
+            document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
+            
+            document.getElementById('formTitulo').innerText = "Editando Registro";
+            document.getElementById('btnSalvar').innerText = "Atualizar";
+            document.getElementById('btnCancelarEdicao').classList.remove('hidden');
+            
+            // Rola a tela para o topo suavemente
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+
+        function cancelarEdicao() {
+            document.getElementById('editId').value = '';
+            document.getElementById('nome').value = '';
+            document.getElementById('valor').value = '';
+            document.getElementById('vencimentoDia').value = '';
+            document.getElementById('formTitulo').innerText = "Novo Lançamento";
+            document.getElementById('btnSalvar').innerText = "Salvar";
+            document.getElementById('btnCancelarEdicao').classList.add('hidden');
+        }
+
+        // ALTERAR STATUS PAGO/ABERTO
+        async function alternarStatus(id, status) {
+            await supabaseClient.from('despesas').update({ paga: status }).eq('id', id);
+            buscarDados();
+        }
+
+        // REMOVER
+        async function remover(id) {
+            if (confirm("Tem certeza que deseja excluir permanentemente este item?")) {
+                await supabaseClient.from('despesas').delete().eq('id', id);
+                buscarDados();
+            }
+        }
+
+        // ATUALIZAR TELA
+        function renderizar() {
+            const container = document.getElementById('listaContainer');
+            container.innerHTML = '';
+            let totalG = 0, totalP = 0;
+
+            if (despesasDoMes.length === 0) {
+                container.innerHTML = `<p class="text-center text-slate-400 text-sm py-10 italic">Nenhum lançamento para este mês.</p>`;
+            }
+
+            despesasDoMes.forEach((item, index) => {
+                totalG += item.valor;
+                if(item.paga) totalP += item.valor;
+
+                const dia = item.vencimento.split('-')[2];
+                const div = document.createElement('div');
+                div.className = `p-4 rounded-2xl border flex flex-col md:flex-row md:items-center justify-between gap-4 transition-all duration-300 ${item.paga ? 'bg-slate-50 border-slate-200 opacity-70' : 'bg-white border-white shadow-sm hover:shadow-md'}`;
+                
+                div.innerHTML = `
+                    <div class="flex flex-col flex-1 group" onclick="editarItem(${index})">
+                        <div class="flex items-center gap-2 cursor-pointer">
+                            <span class="font-bold text-slate-800 text-lg leading-tight group-hover:text-blue-600 transition">${item.nome}</span>
+                            ${item.fixa ? '<span class="fixo-tag">Fixo</span>' : ''}
+                            <span class="text-[10px] text-blue-400 opacity-0 group-hover:opacity-100 transition ml-2">✎ editar</span>
+                        </div>
+                        <span class="text-[11px] text-slate-500 font-bold uppercase tracking-tighter mt-1">Vencimento: Dia ${dia} • <span class="text-blue-600">R$ ${item.valor.toLocaleString('pt-br', {minimumFractionDigits: 2})}</span></span>
+                    </div>
+                    <div class="flex items-center gap-2">
+                        <button onclick="alternarStatus('${item.id}', false)" class="text-[10px] font-black px-4 py-2.5 rounded-xl border transition-all ${!item.paga ? 'btn-aberto shadow-md' : 'bg-white text-slate-300 border-slate-100 hover:text-red-400'}">ABERTO</button>
+                        <button onclick="alternarStatus('${item.id}', true)" class="text-[10px] font-black px-4 py-2.5 rounded-xl border transition-all ${item.paga ? 'btn-pago shadow-md' : 'bg-white text-slate-300 border-slate-100 hover:text-emerald-400'}">PAGO</button>
+                        <button onclick="remover('${item.id}')" class="ml-2 text-slate-300 hover:text-red-500 transition px-2">✕</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+
+            // Cálculos e Widgets
+            const percent = totalG > 0 ? (totalP / totalG) * 100 : 0;
+            document.getElementById('progressBar').style.width = percent + '%';
+            document.getElementById('porcentagemTexto').innerText = Math.round(percent) + '%';
+            document.getElementById('totalGeral').innerText = `R$ ${totalG.toLocaleString('pt-br', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalPago').innerText = `R$ ${totalP.toLocaleString('pt-br', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalRestante').innerText = `R$ ${(totalG - totalP).toLocaleString('pt-br', {minimumFractionDigits: 2})}`;
+        }
+
+        // Inicia a busca ao carregar a página
+        buscarDados();
+    </script>
+</body>
+</html>
