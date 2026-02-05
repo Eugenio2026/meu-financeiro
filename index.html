@@ -3,14 +3,34 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financeiro</title>
+    <title>Controle Financeiro Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <style>
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
+        .btn-pago { background-color: #10b981 !important; color: white; }
+        .btn-aberto { background-color: #ef4444 !important; color: white; }
+    </style>
 </head>
-<body class="bg-slate-100 p-4">
-    <div id="app" class="max-w-md mx-auto bg-white p-6 rounded-xl shadow-lg">
-        <h1 class="font-bold mb-4">Teste de Conexão</h1>
-        <div id="status" class="text-blue-500">Conectando...</div>
+<body class="bg-slate-100 p-4 font-sans">
+    <div class="max-w-2xl mx-auto space-y-6">
+        <div class="bg-white rounded-2xl shadow-sm p-6 border-b-4 border-blue-600">
+            <h1 class="text-2xl font-black text-slate-800">Checklist de Contas</h1>
+            <p class="text-sm text-slate-500 font-medium italic">Sincronizado com Supabase</p>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="number" id="valor" placeholder="R$ Valor" class="border rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="number" id="vencimentoDia" placeholder="Dia" min="1" max="31" class="border rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="salvarLancamento()" class="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-blue-700 uppercase text-sm">Salvar</button>
+            </div>
+        </div>
+
+        <div id="listaContainer" class="space-y-3 pb-12">
+            <p class="text-center text-slate-400 uppercase text-xs font-bold">Carregando dados...</p>
+        </div>
     </div>
 
     <script>
@@ -18,17 +38,73 @@
         const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6ZmpkdHBsbG9jZGJlcXN4aGx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyOTkxOTYsImV4cCI6MjA4NTg3NTE5Nn0.-4mugGyPB6ozbtTSgjRd_buHea3m9rf-yRnxz7BY6CA";
         const supabaseClient = supabase.createClient(_URL, _KEY);
 
-        async function testar() {
-            const { data, error } = await supabaseClient.from('despesas').select('*').limit(1);
+        async function buscarDados() {
+            const { data, error } = await supabaseClient.from('despesas').select('*').order('vencimento', { ascending: true });
             if (error) {
-                document.getElementById('status').innerText = "Erro: " + error.message;
-                document.getElementById('status').classList.add('text-red-500');
+                console.error(error);
+                document.getElementById('listaContainer').innerHTML = "Erro ao carregar lista.";
             } else {
-                document.getElementById('status').innerText = "✅ CONECTADO COM SUCESSO!";
-                document.getElementById('status').classList.add('text-green-500');
+                renderizar(data);
             }
         }
-        testar();
+
+        async function salvarLancamento() {
+            const nome = document.getElementById('nome').value;
+            const valor = parseFloat(document.getElementById('valor').value);
+            const dia = document.getElementById('vencimentoDia').value;
+            const mesAtual = new Date().toISOString().substring(0, 7);
+
+            if (!nome || !valor || !dia) return alert("Preencha tudo!");
+
+            const { error } = await supabaseClient.from('despesas').insert([{
+                nome, valor, vencimento: `${mesAtual}-${dia.padStart(2, '0')}`, paga: false
+            }]);
+
+            if (error) alert("Erro ao salvar!");
+            else {
+                document.getElementById('nome').value = '';
+                document.getElementById('valor').value = '';
+                document.getElementById('vencimentoDia').value = '';
+                buscarDados();
+            }
+        }
+
+        async function alternarStatus(id, statusAtual) {
+            await supabaseClient.from('despesas').update({ paga: !statusAtual }).eq('id', id);
+            buscarDados();
+        }
+
+        async function excluir(id) {
+            if (confirm("Excluir conta?")) {
+                await supabaseClient.from('despesas').delete().eq('id', id);
+                buscarDados();
+            }
+        }
+
+        function renderizar(dados) {
+            const container = document.getElementById('listaContainer');
+            container.innerHTML = dados.length === 0 ? '<p class="text-center text-slate-400">Nenhuma conta lançada.</p>' : '';
+            
+            dados.forEach(item => {
+                const div = document.createElement('div');
+                div.className = `bg-white p-4 rounded-xl shadow-sm border-l-4 flex justify-between items-center ${item.paga ? 'border-emerald-500' : 'border-rose-500'}`;
+                div.innerHTML = `
+                    <div>
+                        <p class="font-bold text-slate-700">${item.nome}</p>
+                        <p class="text-xs text-slate-400 font-bold uppercase">Dia ${item.vencimento.split('-')[2]} • R$ ${item.valor.toFixed(2)}</p>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="alternarStatus('${item.id}', ${item.paga})" class="px-3 py-1 rounded-lg text-[10px] font-bold uppercase ${item.paga ? 'btn-pago' : 'btn-aberto'}">
+                            ${item.paga ? 'Pago' : 'Aberto'}
+                        </button>
+                        <button onclick="excluir('${item.id}')" class="text-slate-300 hover:text-rose-500 text-xs font-bold">X</button>
+                    </div>
+                `;
+                container.appendChild(div);
+            });
+        }
+
+        buscarDados();
     </script>
 </body>
 </html>
