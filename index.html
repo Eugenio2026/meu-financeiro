@@ -102,26 +102,24 @@ const supabaseClient = supabase.createClient(_URL, _KEY);
         const hoje = new Date();
         document.getElementById('filtroMes').value = hoje.toISOString().substring(0, 7);
 
-        // BUSCAR DADOS DO BANCO
         async function buscarDados() {
-            const mesRef = document.getElementById('filtroMes').value;
-            
-            // Filtra no banco apenas as datas que começam com o "YYYY-MM" selecionado
-            const { data, error } = await supabaseClient
-                .from('despesas')
-                .select('*')
-                .filter('vencimento', 'gte', `${mesRef}-01`)
-                .filter('vencimento', 'lte', `${mesRef}-31`)
-                .order('vencimento', { ascending: true });
+    const mesRef = document.getElementById('filtroMes').value;
+    
+    // Versão simplificada para evitar o erro de conexão travada
+    const { data, error } = await supabaseClient
+        .from('despesas')
+        .select('*')
+        .order('vencimento', { ascending: true });
 
-            if (error) {
-                console.error("Erro ao buscar:", error);
-                alert("Erro ao conectar com o banco de dados.");
-            } else {
-                despesasDoMes = data;
-                renderizar();
-            }
-        }
+    if (error) {
+        console.error("Erro Supabase:", error);
+        // Em vez de alert, vamos apenas mostrar no console para não travar a tela
+    } else {
+        // Filtra os dados localmente para garantir que o gráfico não quebre
+        despesasDoMes = data.filter(d => d.vencimento.startsWith(mesRef));
+        renderizar();
+    }
+}
 
         // SALVAR OU ATUALIZAR
         async function salvarLancamento() {
@@ -249,3 +247,4 @@ const supabaseClient = supabase.createClient(_URL, _KEY);
     </script>
 </body>
 </html>
+
