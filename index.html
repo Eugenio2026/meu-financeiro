@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financeiro Pro - Segurança Total</title>
+    <title>Financeiro Pro - Versão Robusta</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -11,7 +11,6 @@
         .dark .bg-white { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
         #telaAuth { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
         .fixo-tag { background-color: #eff6ff; color: #1d4ed8; font-size: 9px; padding: 2px 8px; border-radius: 999px; font-weight: 800; border: 1px solid #dbeafe; }
-        .item-editando { border: 2px solid #3b82f6 !important; background-color: #eff6ff !important; }
         .hidden { display: none !important; }
     </style>
 </head>
@@ -98,7 +97,7 @@
         let despesasDoMes = [];
         document.getElementById('filtroMes').value = new Date().toISOString().substring(0, 7);
 
-        // --- MONITOR DE SESSÃO E RECUPERAÇÃO ---
+        // --- SISTEMA DE AUTENTICAÇÃO COM ERROS CLAROS ---
         supabaseClient.auth.onAuthStateChange((event, session) => {
             if (event === 'PASSWORD_RECOVERY') {
                 document.getElementById('authTitulo').innerText = "Nova Senha";
@@ -112,30 +111,32 @@
         async function gerenciarAuth() {
             const email = document.getElementById('emailAuth').value;
             const password = document.getElementById('senhaAuth').value;
+            if(!email || !password) return alert("Preencha todos os campos.");
+
             if (isLoginMode) {
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) alert("E-mail ou senha incorretos.");
+                if (error) alert("Erro ao entrar: " + error.message);
             } else {
                 const { error } = await supabaseClient.auth.signUp({ email, password });
-                if (error) alert(error.message); else alert("Conta criada!");
+                if (error) alert("Erro no cadastro: " + error.message); // Exibe erro de rate limit se houver
+                else alert("Cadastro realizado! Se o e-mail de confirmação estiver ativo, verifique a sua caixa de entrada.");
             }
         }
 
         async function esqueciSenha() {
             const email = document.getElementById('emailAuth').value;
-            if(!email) return alert("Digite o e-mail.");
-            // redirectTo deve ser exatamente a URL do seu site
+            if(!email) return alert("Digite o e-mail primeiro.");
             const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
                 redirectTo: window.location.origin + window.location.pathname
             });
-            if (error) alert(error.message); else alert("Link de recuperação enviado ao e-mail!");
+            if (error) alert("Erro: " + error.message); else alert("Link de recuperação enviado!");
         }
 
         async function atualizarSenha() {
             const new_password = document.getElementById('novaSenhaInput').value;
             const { error } = await supabaseClient.auth.updateUser({ password: new_password });
             if (error) alert(error.message);
-            else { alert("Senha alterada com sucesso!"); location.reload(); }
+            else { alert("Senha alterada!"); location.reload(); }
         }
 
         function entrarNoApp() {
@@ -146,52 +147,83 @@
 
         async function logout() { 
             await supabaseClient.auth.signOut(); 
-            // Limpa o localStorage para garantir que nada fique preenchido
             localStorage.clear();
             location.reload(); 
         }
 
-        // --- FUNÇÕES DO APP ---
+        // --- BUSCA DE DADOS COM LÓGICA DE DATA SEGURA ---
         async function buscarDados() {
-            const mesRef = document.getElementById('filtroMes').value;
-            const { data } = await supabaseClient.from('despesas').select('*');
-            despesasDoMes = (data || []).filter(d => d.vencimento.startsWith(mesRef));
-            renderizar();
+            const mesRef = document.getElementById('filtroMes').value; // Formato YYYY-MM
+            
+            // Lógica Robusta: Define o início e fim do mês sem fixar o dia 31
+            const dataInicio = `${mesRef}-01`;
+            const partesMes = mesRef.split('-');
+            const proximoMesData = new Date(partesMes[0], partesMes[1], 1); // Dia 1 do próximo mês
+            const dataFim = proximoMesData.toISOString().split('T')[0];
+
+            const { data, error } = await supabaseClient
+                .from('despesas')
+                .select('*')
+                .gte('vencimento', dataInicio)
+                .lt('vencimento', dataFim)
+                .order('vencimento', { ascending: true });
+
+            if (error) {
+                alert("Erro ao carregar dados: " + error.message);
+            } else {
+                despesasDoMes = data || [];
+                renderizar();
+            }
         }
 
         function renderizar() {
             const container = document.getElementById('listaContainer');
             container.innerHTML = '';
             let tG = 0, tP = 0;
-            despesasDoMes.sort((a,b) => a.vencimento.localeCompare(b.vencimento)).forEach((item, idx) => {
+
+            if (despesasDoMes.length === 0) {
+                container.innerHTML = `<p class="text-center text-slate-400 text-sm py-10 italic">Nenhum lançamento encontrado.</p>`;
+            }
+
+            despesasDoMes.forEach((item, idx) => {
                 tG += item.valor; if(item.paga) tP += item.valor;
                 const div = document.createElement('div');
-                div.className = `p-4 rounded-2xl bg-white border flex justify-between items-center ${item.paga ? 'opacity-50 grayscale' : 'shadow-sm'}`;
+                div.className = `p-4 rounded-2xl bg-white border flex justify-between items-center transition-all ${item.paga ? 'opacity-50 grayscale' : 'shadow-sm'}`;
                 div.innerHTML = `
                     <div onclick="editarItem(${idx})" class="cursor-pointer">
-                        <p class="font-bold">${item.nome} ${item.fixa ? '<span class="fixo-tag">Fixo</span>' : ''}</p>
+                        <p class="font-bold text-slate-800">${item.nome} ${item.fixa ? '<span class="fixo-tag">Fixo</span>' : ''}</p>
                         <p class="text-[10px] font-bold text-slate-400 uppercase">Dia ${item.vencimento.split('-')[2]} • R$ ${item.valor.toFixed(2)}</p>
                     </div>
-                    <button onclick="alternarStatus('${item.id}', ${!item.paga})" class="px-4 py-2 rounded-xl text-[10px] font-black ${item.paga ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'} uppercase">
-                        ${item.paga ? 'Pago' : 'Aberto'}
-                    </button>`;
+                    <div class="flex items-center gap-2">
+                        <button onclick="alternarStatus('${item.id}', ${!item.paga})" class="px-4 py-2 rounded-xl text-[10px] font-black ${item.paga ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'} uppercase">
+                            ${item.paga ? 'Pago' : 'Aberto'}
+                        </button>
+                        <button onclick="remover('${item.id}')" class="text-slate-300 hover:text-red-500 px-2">✕</button>
+                    </div>`;
                 container.appendChild(div);
             });
-            document.getElementById('totalGeral').innerText = `R$ ${tG.toFixed(2)}`;
-            document.getElementById('totalPago').innerText = `R$ ${tP.toFixed(2)}`;
+            document.getElementById('totalGeral').innerText = `R$ ${tG.toLocaleString('pt-br', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalPago').innerText = `R$ ${tP.toLocaleString('pt-br', {minimumFractionDigits: 2})}`;
         }
 
         async function salvarLancamento() {
             const id = document.getElementById('editId').value;
+            const dia = document.getElementById('vencimentoDia').value.padStart(2, '0');
             const payload = {
                 nome: document.getElementById('nome').value,
-                valor: parseFloat(document.getElementById('valor').value),
-                vencimento: `${document.getElementById('filtroMes').value}-${document.getElementById('vencimentoDia').value.padStart(2, '0')}`,
+                valor: parseFloat(document.getElementById('valor').value) || 0,
+                vencimento: `${document.getElementById('filtroMes').value}-${dia}`,
                 fixa: document.getElementById('checkFixa').checked
             };
-            if (id) await supabaseClient.from('despesas').update(payload).eq('id', id);
-            else await supabaseClient.from('despesas').insert([payload]);
-            cancelarEdicao(); buscarDados();
+
+            if(!payload.nome || isNaN(payload.valor)) return alert("Preencha descrição e valor.");
+
+            const { error } = id 
+                ? await supabaseClient.from('despesas').update(payload).eq('id', id)
+                : await supabaseClient.from('despesas').insert([payload]);
+
+            if (error) alert("Erro ao salvar: " + error.message);
+            else { cancelarEdicao(); buscarDados(); }
         }
 
         function alternarAuth() {
@@ -201,7 +233,9 @@
         }
 
         async function alternarStatus(id, status) { await supabaseClient.from('despesas').update({ paga: status }).eq('id', id); buscarDados(); }
+        async function remover(id) { if(confirm("Eliminar este item?")) { await supabaseClient.from('despesas').delete().eq('id', id); buscarDados(); } }
         function toggleDarkMode() { document.getElementById('corpo').classList.toggle('dark'); }
+        
         function editarItem(idx) {
             const item = despesasDoMes[idx];
             document.getElementById('editId').value = item.id;
@@ -210,7 +244,9 @@
             document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
             document.getElementById('checkFixa').checked = item.fixa;
             document.getElementById('btnCancelar').classList.remove('hidden');
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
+
         function cancelarEdicao() {
             document.getElementById('editId').value = '';
             document.getElementById('nome').value = '';
