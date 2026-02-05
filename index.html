@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financeiro Pro - Versão Robusta</title>
+    <title>Financeiro Pro - Versão Final Robusta</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
@@ -11,7 +11,10 @@
         .dark .bg-white { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
         #telaAuth { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
         .fixo-tag { background-color: #eff6ff; color: #1d4ed8; font-size: 9px; padding: 2px 8px; border-radius: 999px; font-weight: 800; border: 1px solid #dbeafe; }
+        .item-editando { border: 2px solid #3b82f6 !important; background-color: #f0f7ff !important; }
         .hidden { display: none !important; }
+        /* Remove setas de input number */
+        input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4 font-sans transition-colors duration-300" id="corpo">
@@ -21,8 +24,17 @@
             <h2 id="authTitulo" class="text-2xl font-black mb-6 text-center text-slate-800">Financeiro Pro</h2>
             
             <form id="camposAuth" onsubmit="return false;" autocomplete="off" class="space-y-4">
-                <input type="email" id="emailAuth" placeholder="E-mail" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
-                <input type="password" id="senhaAuth" placeholder="Senha" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50">
+                <input style="display:none" type="text" name="fake_user"/>
+                <input style="display:none" type="password" name="fake_password"/>
+
+                <input type="email" id="u_mail" name="u_mail" placeholder="E-mail" 
+                       class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+                       autocomplete="new-password">
+                
+                <input type="text" id="u_pass" name="u_pass" placeholder="Senha" 
+                       class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
+                       autocomplete="new-password"
+                       onfocus="this.type='password'">
                 
                 <button onclick="gerenciarAuth()" id="btnPrincipal" class="w-full bg-blue-600 text-white py-4 rounded-xl font-black hover:bg-blue-700 transition uppercase shadow-lg">Entrar</button>
                 
@@ -78,9 +90,9 @@
             </div>
             <input type="hidden" id="editId">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-3 text-sm outline-none">
-                <input type="number" id="valor" placeholder="Valor" class="border rounded-xl px-4 py-3 text-sm outline-none">
-                <input type="number" id="vencimentoDia" placeholder="Dia" class="border rounded-xl px-4 py-3 text-sm outline-none">
+                <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 focus:bg-white transition-all">
+                <input type="number" id="valor" placeholder="Valor" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 focus:bg-white transition-all">
+                <input type="number" id="vencimentoDia" placeholder="Dia" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 focus:bg-white transition-all">
                 <button onclick="salvarLancamento()" id="btnSalvar" class="bg-blue-600 text-white px-4 py-3 rounded-xl font-black uppercase text-xs">Salvar</button>
             </div>
         </div>
@@ -97,7 +109,7 @@
         let despesasDoMes = [];
         document.getElementById('filtroMes').value = new Date().toISOString().substring(0, 7);
 
-        // --- SISTEMA DE AUTENTICAÇÃO COM ERROS CLAROS ---
+        // --- AUTH E SEGURANÇA ---
         supabaseClient.auth.onAuthStateChange((event, session) => {
             if (event === 'PASSWORD_RECOVERY') {
                 document.getElementById('authTitulo').innerText = "Nova Senha";
@@ -109,34 +121,34 @@
         });
 
         async function gerenciarAuth() {
-            const email = document.getElementById('emailAuth').value;
-            const password = document.getElementById('senhaAuth').value;
-            if(!email || !password) return alert("Preencha todos os campos.");
+            const email = document.getElementById('u_mail').value;
+            const password = document.getElementById('u_pass').value;
+            if(!email || !password) return alert("Preencha e-mail e senha.");
 
             if (isLoginMode) {
                 const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) alert("Erro ao entrar: " + error.message);
+                if (error) alert("Erro: " + error.message);
             } else {
                 const { error } = await supabaseClient.auth.signUp({ email, password });
-                if (error) alert("Erro no cadastro: " + error.message); // Exibe erro de rate limit se houver
-                else alert("Cadastro realizado! Se o e-mail de confirmação estiver ativo, verifique a sua caixa de entrada.");
+                if (error) alert("Erro no cadastro: " + error.message);
+                else alert("Cadastro realizado!");
             }
         }
 
         async function esqueciSenha() {
-            const email = document.getElementById('emailAuth').value;
-            if(!email) return alert("Digite o e-mail primeiro.");
+            const email = document.getElementById('u_mail').value;
+            if(!email) return alert("Digite seu e-mail no campo acima.");
             const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
                 redirectTo: window.location.origin + window.location.pathname
             });
-            if (error) alert("Erro: " + error.message); else alert("Link de recuperação enviado!");
+            if (error) alert(error.message); else alert("E-mail de recuperação enviado!");
         }
 
         async function atualizarSenha() {
             const new_password = document.getElementById('novaSenhaInput').value;
             const { error } = await supabaseClient.auth.updateUser({ password: new_password });
             if (error) alert(error.message);
-            else { alert("Senha alterada!"); location.reload(); }
+            else { alert("Senha atualizada!"); location.reload(); }
         }
 
         function entrarNoApp() {
@@ -148,18 +160,25 @@
         async function logout() { 
             await supabaseClient.auth.signOut(); 
             localStorage.clear();
+            sessionStorage.clear();
             location.reload(); 
         }
 
-        // --- BUSCA DE DADOS COM LÓGICA DE DATA SEGURA ---
+        function alternarAuth() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('u_mail').value = '';
+            document.getElementById('u_pass').value = '';
+            document.getElementById('u_pass').type = 'text'; 
+            document.getElementById('authTitulo').innerText = isLoginMode ? 'Financeiro Pro' : 'Criar Conta';
+            document.getElementById('btnPrincipal').innerText = isLoginMode ? 'Entrar' : 'Cadastrar';
+        }
+
+        // --- LÓGICA DE DADOS ---
         async function buscarDados() {
-            const mesRef = document.getElementById('filtroMes').value; // Formato YYYY-MM
-            
-            // Lógica Robusta: Define o início e fim do mês sem fixar o dia 31
+            const mesRef = document.getElementById('filtroMes').value;
             const dataInicio = `${mesRef}-01`;
-            const partesMes = mesRef.split('-');
-            const proximoMesData = new Date(partesMes[0], partesMes[1], 1); // Dia 1 do próximo mês
-            const dataFim = proximoMesData.toISOString().split('T')[0];
+            const partes = mesRef.split('-');
+            const dataFim = new Date(partes[0], partes[1], 1).toISOString().split('T')[0];
 
             const { data, error } = await supabaseClient
                 .from('despesas')
@@ -168,12 +187,8 @@
                 .lt('vencimento', dataFim)
                 .order('vencimento', { ascending: true });
 
-            if (error) {
-                alert("Erro ao carregar dados: " + error.message);
-            } else {
-                despesasDoMes = data || [];
-                renderizar();
-            }
+            if (error) alert("Erro: " + error.message);
+            else { despesasDoMes = data || []; renderizar(); }
         }
 
         function renderizar() {
@@ -182,7 +197,7 @@
             let tG = 0, tP = 0;
 
             if (despesasDoMes.length === 0) {
-                container.innerHTML = `<p class="text-center text-slate-400 text-sm py-10 italic">Nenhum lançamento encontrado.</p>`;
+                container.innerHTML = `<p class="text-center text-slate-400 text-sm py-10 italic">Nenhuma conta este mês.</p>`;
             }
 
             despesasDoMes.forEach((item, idx) => {
@@ -198,7 +213,7 @@
                         <button onclick="alternarStatus('${item.id}', ${!item.paga})" class="px-4 py-2 rounded-xl text-[10px] font-black ${item.paga ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'} uppercase">
                             ${item.paga ? 'Pago' : 'Aberto'}
                         </button>
-                        <button onclick="remover('${item.id}')" class="text-slate-300 hover:text-red-500 px-2">✕</button>
+                        <button onclick="remover('${item.id}')" class="text-slate-300 hover:text-rose-500 px-2 transition-colors">✕</button>
                     </div>`;
                 container.appendChild(div);
             });
@@ -216,24 +231,18 @@
                 fixa: document.getElementById('checkFixa').checked
             };
 
-            if(!payload.nome || isNaN(payload.valor)) return alert("Preencha descrição e valor.");
+            if(!payload.nome || isNaN(payload.valor) || !dia) return alert("Preencha descrição, valor e dia.");
 
             const { error } = id 
                 ? await supabaseClient.from('despesas').update(payload).eq('id', id)
                 : await supabaseClient.from('despesas').insert([payload]);
 
-            if (error) alert("Erro ao salvar: " + error.message);
+            if (error) alert("Erro: " + error.message);
             else { cancelarEdicao(); buscarDados(); }
         }
 
-        function alternarAuth() {
-            isLoginMode = !isLoginMode;
-            document.getElementById('authTitulo').innerText = isLoginMode ? 'Financeiro Pro' : 'Criar Conta';
-            document.getElementById('btnPrincipal').innerText = isLoginMode ? 'Entrar' : 'Cadastrar';
-        }
-
         async function alternarStatus(id, status) { await supabaseClient.from('despesas').update({ paga: status }).eq('id', id); buscarDados(); }
-        async function remover(id) { if(confirm("Eliminar este item?")) { await supabaseClient.from('despesas').delete().eq('id', id); buscarDados(); } }
+        async function remover(id) { if(confirm("Apagar esta conta?")) { await supabaseClient.from('despesas').delete().eq('id', id); buscarDados(); } }
         function toggleDarkMode() { document.getElementById('corpo').classList.toggle('dark'); }
         
         function editarItem(idx) {
@@ -244,6 +253,7 @@
             document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
             document.getElementById('checkFixa').checked = item.fixa;
             document.getElementById('btnCancelar').classList.remove('hidden');
+            document.getElementById('formTitulo').innerText = "Editando Registro";
             window.scrollTo({ top: 0, behavior: 'smooth' });
         }
 
@@ -252,7 +262,9 @@
             document.getElementById('nome').value = '';
             document.getElementById('valor').value = '';
             document.getElementById('vencimentoDia').value = '';
+            document.getElementById('checkFixa').checked = false;
             document.getElementById('btnCancelar').classList.add('hidden');
+            document.getElementById('formTitulo').innerText = "Novo Lançamento";
         }
     </script>
 </body>
