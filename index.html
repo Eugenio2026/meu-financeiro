@@ -154,7 +154,6 @@
             document.documentElement.classList.add('dark');
         }
 
-        // --- AUTH ---
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
             if (session) {
                 userId = session.user.id;
@@ -190,24 +189,33 @@
             document.getElementById('authTitulo').innerText = isLoginMode ? 'Financeiro Pro' : 'Nova Conta'; 
         }
 
-        // --- DADOS ---
         async function buscarDados() {
             if (!userId) return avisar("Usuário não autenticado", "erro");
             const mesRef = document.getElementById('filtroMes').value;
-            const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            const { data, error } = await supabaseClient
+                .from('despesas')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('excluida', false);  // só mostra não excluídas
+
             if (error) return avisar("Erro ao carregar dados", "erro");
             despesasDoMes = data.filter(d => d.vencimento.startsWith(mesRef));
 
             await adicionarFixasAutomaticamente(mesRef, data);
 
-            const { data: updatedData, error: updateError } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
-            if (updateError) return avisar("Erro ao atualizar lista", "erro");
+            const { data: updatedData } = await supabaseClient
+                .from('despesas')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('excluida', false);
+
             despesasDoMes = updatedData.filter(d => d.vencimento.startsWith(mesRef));
             renderizar();
         }
 
         async function adicionarFixasAutomaticamente(mesAtual, allData) {
-            const fixasExistentes = allData.filter(d => d.fixa === true);
+            // Pegar apenas fixas NÃO excluídas
+            const fixasExistentes = allData.filter(d => d.fixa === true && d.excluida !== true);
             const nomesFixosUnicos = [...new Set(fixasExistentes.map(d => d.nome))];
             const nomesNoMesAtual = allData.filter(d => d.vencimento.startsWith(mesAtual)).map(d => d.nome);
             const paraAdicionar = nomesFixosUnicos.filter(nome => !nomesNoMesAtual.includes(nome));
@@ -215,7 +223,8 @@
             if (paraAdicionar.length === 0) return;
 
             for (let nome of paraAdicionar) {
-                const ultimaFixa = fixasExistentes.filter(d => d.nome === nome)
+                const ultimaFixa = fixasExistentes
+                    .filter(d => d.nome === nome)
                     .sort((a, b) => b.vencimento.localeCompare(a.vencimento))[0];
                 if (!ultimaFixa) continue;
                 const dia = ultimaFixa.vencimento.split('-')[2];
@@ -224,6 +233,7 @@
                     valor: ultimaFixa.valor,
                     fixa: true,
                     paga: false,
+                    excluida: false,
                     vencimento: `${mesAtual}-${dia}`,
                     user_id: userId
                 }]);
@@ -239,7 +249,12 @@
             const [ano, mes] = mesAtual.split('-').map(Number);
             const mesAnterior = new Date(ano, mes - 2, 1).toISOString().substring(0, 7);
 
-            const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            const { data, error } = await supabaseClient
+                .from('despesas')
+                .select('*')
+                .eq('user_id', userId)
+                .eq('excluida', false);
+
             if (error) return avisar("Erro ao importar", "erro");
 
             const naoFixasAnterior = data.filter(d => !d.fixa && d.vencimento.startsWith(mesAnterior));
@@ -256,6 +271,7 @@
                     valor: item.valor,
                     fixa: false,
                     paga: false,
+                    excluida: false,
                     vencimento: `${mesAtual}-${dia}`,
                     user_id: userId
                 }]);
@@ -275,6 +291,7 @@
                 vencimento: `${mesAtual}-${dia}`,
                 fixa: item.fixa,
                 paga: false,
+                excluida: false,
                 user_id: userId
             };
 
@@ -352,6 +369,7 @@
                 valor: valor,
                 vencimento: `${document.getElementById('filtroMes').value}-${dia.toString().padStart(2, '0')}`,
                 fixa: document.getElementById('checkFixa').checked,
+                excluida: false,
                 user_id: userId
             };
             if (!payload.nome) return avisar("Descrição obrigatória", "erro");
@@ -380,8 +398,13 @@
         async function remover(id, isFixa = false) { 
             if (!userId) return avisar("Usuário não autenticado", "erro");
             const tipo = isFixa ? "despesa **fixa**" : "despesa";
-            if(confirm(`Tem certeza que deseja excluir esta ${tipo}?`)) { 
-                const { error } = await supabaseClient.from('despesas').delete().eq('id', id).eq('user_id', userId);
+            if (confirm(`Tem certeza que deseja excluir esta ${tipo}?\n\n${isFixa ? 'Ela não será mais criada automaticamente nos próximos meses.' : ''}`)) { 
+                const { error } = await supabaseClient
+                    .from('despesas')
+                    .update({ excluida: true })
+                    .eq('id', id)
+                    .eq('user_id', userId);
+
                 if (error) {
                     avisar("Erro ao excluir: " + error.message, "erro");
                 } else {
