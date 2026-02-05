@@ -195,12 +195,13 @@
             if (!userId) return avisar("Usuário não autenticado", "erro");
             const mesRef = document.getElementById('filtroMes').value;
             const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
-            if (error) return avisar("Erro ao carregar", "erro");
+            if (error) return avisar("Erro ao carregar dados", "erro");
             despesasDoMes = data.filter(d => d.vencimento.startsWith(mesRef));
 
             await adicionarFixasAutomaticamente(mesRef, data);
 
-            const { data: updatedData } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            const { data: updatedData, error: updateError } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            if (updateError) return avisar("Erro ao atualizar lista", "erro");
             despesasDoMes = updatedData.filter(d => d.vencimento.startsWith(mesRef));
             renderizar();
         }
@@ -328,7 +329,9 @@
                         <button onclick="duplicarDespesa(${idx})" class="px-3 py-2 rounded-xl text-sm font-bold bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 transition" title="Duplicar">
                             📋
                         </button>
-                        <button onclick="remover('${item.id}')" class="text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 text-xl px-2 transition">✕</button>
+                        <button onclick="remover('${item.id}', ${item.fixa})" class="text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 text-xl px-2 transition" title="Excluir">
+                            ✕
+                        </button>
                     </div>`;
 
                 container.appendChild(div);
@@ -369,15 +372,22 @@
 
         async function alternarStatus(id, status) { 
             if (!userId) return avisar("Usuário não autenticado", "erro");
-            await supabaseClient.from('despesas').update({ paga: status }).eq('id', id).eq('user_id', userId); 
+            const { error } = await supabaseClient.from('despesas').update({ paga: status }).eq('id', id).eq('user_id', userId);
+            if (error) avisar("Erro ao atualizar status", "erro");
             buscarDados(); 
         }
 
-        async function remover(id) { 
+        async function remover(id, isFixa = false) { 
             if (!userId) return avisar("Usuário não autenticado", "erro");
-            if(confirm("Tem certeza que deseja remover esta despesa?")) { 
-                await supabaseClient.from('despesas').delete().eq('id', id).eq('user_id', userId); 
-                buscarDados(); 
+            const tipo = isFixa ? "despesa **fixa**" : "despesa";
+            if(confirm(`Tem certeza que deseja excluir esta ${tipo}?`)) { 
+                const { error } = await supabaseClient.from('despesas').delete().eq('id', id).eq('user_id', userId);
+                if (error) {
+                    avisar("Erro ao excluir: " + error.message, "erro");
+                } else {
+                    avisar("Despesa excluída com sucesso", "sucesso");
+                    buscarDados();
+                }
             } 
         }
         
