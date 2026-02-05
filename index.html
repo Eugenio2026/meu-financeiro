@@ -21,8 +21,16 @@
         .toast-anim { animation: slideUp 0.3s ease-out; }
         .item-transition { transition: all 0.3s ease; }
         .item-paid { opacity: 0.5; transform: scale(0.98); filter: grayscale(80%); }
-        .atrasada { background-color: #fef2f2; border-color: #ef4444; }
-        .dark .atrasada { background-color: #7f1d1d; border-color: #f87171; }
+        .atrasada { 
+            background-color: #fee2e2; 
+            border-color: #dc2626; 
+            border-width: 2px;
+        }
+        .dark .atrasada { 
+            background-color: #7f1d1d; 
+            border-color: #f87171; 
+            border-width: 2px;
+        }
         .icon-lg { font-size: 2.2rem; }
     </style>
 </head>
@@ -136,13 +144,11 @@
             return parseFloat(valorStr.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) || 0;
         }
 
-        // Toggle Dark Mode
         function toggleDarkMode() {
             document.documentElement.classList.toggle('dark');
             localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
         }
 
-        // Carregar tema salvo ou preferência do sistema
         if (localStorage.getItem('theme') === 'dark' || 
             (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
             document.documentElement.classList.add('dark');
@@ -221,7 +227,9 @@
                     user_id: userId
                 }]);
             }
-            avisar("Despesas fixas adicionadas automaticamente!", "sucesso");
+            if (paraAdicionar.length > 0) {
+                avisar(`Adicionadas ${paraAdicionar.length} despesa(s) fixa(s) automaticamente`, "sucesso");
+            }
         }
 
         async function importarDoMesAnterior() {
@@ -251,8 +259,31 @@
                     user_id: userId
                 }]);
             }
-            avisar("Despesas do mês anterior importadas!", "sucesso");
+            avisar(`Importadas ${unicas.length} despesa(s) do mês anterior`, "sucesso");
             buscarDados();
+        }
+
+        async function duplicarDespesa(idx) {
+            const item = despesasDoMes[idx];
+            const mesAtual = document.getElementById('filtroMes').value;
+            const dia = item.vencimento.split('-')[2];
+
+            const payload = {
+                nome: item.nome + " (cópia)",
+                valor: item.valor,
+                vencimento: `${mesAtual}-${dia}`,
+                fixa: item.fixa,
+                paga: false,
+                user_id: userId
+            };
+
+            const { error } = await supabaseClient.from('despesas').insert([payload]);
+            if (error) {
+                avisar("Erro ao duplicar despesa", "erro");
+            } else {
+                avisar("Despesa duplicada com sucesso!", "sucesso");
+                buscarDados();
+            }
         }
 
         function renderizar() {
@@ -280,7 +311,7 @@
                             <div class="flex items-center gap-2 flex-wrap">
                                 <p class="font-bold text-slate-800 dark:text-slate-100">${item.nome}</p>
                                 ${item.fixa ? '<span class="fixo-tag">Fixo</span>' : ''}
-                                ${isAtrasada ? '<span class="text-rose-600 dark:text-rose-400 font-bold text-xs">⚠️ Atrasada</span>' : ''}
+                                ${isAtrasada ? '<span class="text-rose-700 dark:text-rose-300 font-bold text-sm">⚠️ Atrasada</span>' : ''}
                             </div>
                             <p class="text-sm text-slate-500 dark:text-slate-400 mt-1">
                                 Vence dia ${item.vencimento.split('-')[2]} • R$ ${item.valor.toFixed(2)}
@@ -293,6 +324,9 @@
                         </button>
                         <button onclick="alternarStatus('${item.id}', false)" class="px-5 py-2.5 rounded-xl text-sm font-bold bg-rose-600 hover:bg-rose-700 text-white transition min-w-[80px]">
                             Aberto
+                        </button>
+                        <button onclick="duplicarDespesa(${idx})" class="px-3 py-2 rounded-xl text-sm font-bold bg-indigo-100 hover:bg-indigo-200 dark:bg-indigo-900 dark:hover:bg-indigo-800 text-indigo-700 dark:text-indigo-300 transition" title="Duplicar">
+                            📋
                         </button>
                         <button onclick="remover('${item.id}')" class="text-slate-400 dark:text-slate-500 hover:text-rose-600 dark:hover:text-rose-400 text-xl px-2 transition">✕</button>
                     </div>`;
@@ -329,7 +363,7 @@
             else { 
                 cancelarEdicao(); 
                 buscarDados(); 
-                avisar("Salvo com sucesso!", "sucesso"); 
+                avisar(id ? "Alterações salvas!" : "Lançamento salvo!", "sucesso"); 
             }
         }
 
