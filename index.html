@@ -10,6 +10,7 @@
         .dark { background-color: #0f172a; color: #f8fafc; }
         .dark .bg-white { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
         #telaAuth { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
+        .hidden { display: none !important; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4 font-sans transition-colors duration-300" id="corpo">
@@ -17,70 +18,65 @@
     <div id="telaAuth" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm">
             <h2 id="authTitulo" class="text-2xl font-black mb-6 text-center text-slate-800">Bem-vindo</h2>
-            <div class="space-y-4">
+            
+            <div id="camposAuth" class="space-y-4">
                 <input type="email" id="emailAuth" placeholder="Seu e-mail" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500">
                 <input type="password" id="senhaAuth" placeholder="Sua senha" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500">
                 
-                <button onclick="fazerLogin()" id="btnPrincipal" class="w-full bg-blue-600 text-white py-4 rounded-xl font-black hover:bg-blue-700 transition uppercase shadow-lg">Entrar</button>
+                <button onclick="gerenciarAuth()" id="btnPrincipal" class="w-full bg-blue-600 text-white py-4 rounded-xl font-black hover:bg-blue-700 transition uppercase shadow-lg">Entrar</button>
                 
-                <div class="text-center pt-2">
+                <div class="flex flex-col gap-3 text-center pt-2">
                     <button onclick="alternarAuth()" id="btnTroca" class="text-xs font-bold text-slate-400 uppercase hover:text-blue-600">Não tem conta? Cadastre-se</button>
+                    <button onclick="esqueciSenha()" id="btnEsqueci" class="text-[10px] font-bold text-slate-300 uppercase hover:text-rose-400">Esqueci minha senha</button>
                 </div>
+            </div>
+
+            <div id="campoNovaSenha" class="hidden space-y-4">
+                <p class="text-xs text-center text-slate-500">Digite sua nova senha abaixo:</p>
+                <input type="password" id="novaSenhaInput" placeholder="Nova senha" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-emerald-500">
+                <button onclick="atualizarSenha()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black uppercase">Atualizar Senha</button>
             </div>
         </div>
     </div>
 
     <div id="app" class="max-w-2xl mx-auto space-y-6 hidden">
         <div class="bg-white rounded-2xl shadow-sm p-6 border-b-4 border-blue-600 space-y-4">
-            <div class="flex justify-between items-start">
-                <div>
-                    <h1 class="text-2xl font-black text-slate-800">Checklist Financeiro</h1>
-                    <button onclick="toggleDarkMode()" class="text-[10px] font-bold uppercase p-1 bg-slate-100 rounded mt-2">🌓 Trocar Tema</button>
+            <div class="flex justify-between items-center">
+                <h1 class="text-2xl font-black text-slate-800">Minhas Contas</h1>
+                <div class="flex gap-2">
+                    <button onclick="toggleDarkMode()" class="p-2 bg-slate-100 rounded-lg text-lg">🌓</button>
+                    <button onclick="logout()" class="text-rose-500 font-bold text-xs uppercase border border-rose-100 px-3 py-2 rounded-lg">Sair</button>
                 </div>
-                <button onclick="logout()" class="text-rose-500 font-bold text-xs uppercase underline">Sair</button>
             </div>
             
-            <div class="grid grid-cols-2 gap-4">
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase">Salário/Renda</p>
-                    <input type="number" id="salarioInput" onchange="salvarSalario()" placeholder="R$ 0,00" class="bg-transparent font-black text-blue-600 text-xl w-full outline-none">
-                </div>
-                <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
-                    <p class="text-[10px] font-bold text-slate-400 uppercase">Mês Ref.</p>
-                    <input type="month" id="filtroMes" onchange="buscarDados()" class="bg-transparent font-bold text-slate-700 outline-none w-full">
-                </div>
+            <div class="bg-slate-50 p-3 rounded-xl border border-slate-200">
+                <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Mês de Referência</p>
+                <input type="month" id="filtroMes" onchange="buscarDados()" class="bg-transparent font-black text-blue-600 text-xl outline-none w-full">
             </div>
         </div>
 
-        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+        <div class="grid grid-cols-2 gap-4">
             <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-center">
                 <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Total Mês</p>
                 <p id="totalGeral" class="text-xl font-black text-slate-700">R$ 0,00</p>
             </div>
-            <div class="bg-emerald-500 p-4 rounded-2xl shadow-sm text-white text-center relative overflow-hidden">
+            <div class="bg-emerald-500 p-4 rounded-2xl shadow-sm text-white text-center">
                 <p class="text-[10px] font-bold uppercase opacity-80 mb-1">Total Pago</p>
                 <p id="totalPago" class="text-xl font-black">R$ 0,00</p>
-            </div>
-            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-center">
-                <p class="text-[10px] text-blue-600 font-bold uppercase mb-1">Sobra Livre</p>
-                <p id="totalSobra" class="text-xl font-black text-slate-700">R$ 0,00</p>
             </div>
         </div>
 
         <div id="boxForm" class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
             <div class="flex justify-between items-center mb-4">
                 <h2 id="formTitulo" class="font-bold uppercase text-xs">Novo Lançamento</h2>
-                <div class="flex gap-2">
-                    <label class="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-1 cursor-pointer"><input type="checkbox" id="checkFixa"> Fixa</label>
-                    <button onclick="cancelarEdicao()" id="btnCancelar" class="hidden text-rose-500 text-[10px] font-bold uppercase underline">Cancelar</button>
-                </div>
+                <button onclick="cancelarEdicao()" id="btnCancelar" class="hidden text-rose-500 text-[10px] font-bold uppercase underline">Cancelar</button>
             </div>
             <input type="hidden" id="editId">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700">
                 <input type="number" id="valor" placeholder="Valor" class="border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700">
                 <input type="number" id="vencimentoDia" placeholder="Dia" class="border rounded-xl px-4 py-3 text-sm outline-none focus:ring-2 focus:ring-blue-500 dark:bg-slate-700">
-                <button onclick="salvarLancamento()" id="btnSalvar" class="bg-blue-600 text-white px-4 py-3 rounded-xl font-black uppercase text-xs hover:bg-blue-700">Salvar</button>
+                <button onclick="salvarLancamento()" id="btnSalvar" class="bg-blue-600 text-white px-4 py-3 rounded-xl font-black uppercase text-xs">Salvar</button>
             </div>
         </div>
 
@@ -93,36 +89,65 @@
         const supabaseClient = supabase.createClient(_URL, _KEY);
 
         let isLoginMode = true;
-        let despesasDoMes = [];
-        let salarioAtual = localStorage.getItem('salario') || 0;
-        document.getElementById('salarioInput').value = salarioAtual;
         document.getElementById('filtroMes').value = new Date().toISOString().substring(0, 7);
+
+        // Detectar se o usuário veio por um link de recuperação de senha
+        window.onload = () => {
+            if (window.location.hash.includes("type=recovery")) {
+                document.getElementById('authTitulo').innerText = "Nova Senha";
+                document.getElementById('camposAuth').classList.add('hidden');
+                document.getElementById('campoNovaSenha').classList.remove('hidden');
+            } else {
+                verificarSessao();
+            }
+        };
+
+        async function verificarSessao() {
+            const { data } = await supabaseClient.auth.getSession();
+            if (data.session) entrarNoApp();
+        }
 
         function alternarAuth() {
             isLoginMode = !isLoginMode;
             document.getElementById('authTitulo').innerText = isLoginMode ? 'Bem-vindo' : 'Criar Conta';
-            document.getElementById('btnPrincipal').innerText = isLoginMode ? 'Entrar' : 'Cadastrar Gratuitamente';
-            document.getElementById('btnTroca').innerText = isLoginMode ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre aqui';
+            document.getElementById('btnPrincipal').innerText = isLoginMode ? 'Entrar' : 'Cadastrar';
+            document.getElementById('btnTroca').innerText = isLoginMode ? 'Não tem conta? Cadastre-se' : 'Já tem conta? Entre';
+            document.getElementById('btnEsqueci').classList.toggle('hidden', !isLoginMode);
         }
 
-        async function fazerLogin() {
+        async function gerenciarAuth() {
             const email = document.getElementById('emailAuth').value;
             const password = document.getElementById('senhaAuth').value;
+            if(!email || !password) return alert("Preencha os campos!");
 
             if (isLoginMode) {
-                const { data, error } = await supabaseClient.auth.signInWithPassword({ email, password });
-                if (error) alert("Erro ao entrar: " + error.message);
-                else entrarNoApp();
+                const { error } = await supabaseClient.auth.signInWithPassword({ email, password });
+                if (error) alert("Erro: " + error.message); else entrarNoApp();
             } else {
-                const { data, error } = await supabaseClient.auth.signUp({ email, password });
-                if (error) alert("Erro ao cadastrar: " + error.message);
-                else alert("Conta criada! Já pode fazer login.");
+                const { error } = await supabaseClient.auth.signUp({ email, password });
+                if (error) alert("Erro: " + error.message); else alert("Cadastrado! Verifique seu e-mail (se ativado) ou faça login.");
             }
         }
 
+        async function esqueciSenha() {
+            const email = document.getElementById('emailAuth').value;
+            if(!email) return alert("Digite seu e-mail primeiro!");
+            const { error } = await supabaseClient.auth.resetPasswordForEmail(email, {
+                redirectTo: window.location.href,
+            });
+            if (error) alert(error.message); else alert("E-mail de recuperação enviado!");
+        }
+
+        async function atualizarSenha() {
+            const new_password = document.getElementById('novaSenhaInput').value;
+            const { error } = await supabaseClient.auth.updateUser({ password: new_password });
+            if (error) alert(error.message);
+            else { alert("Senha alterada! Faça login."); window.location.hash = ""; location.reload(); }
+        }
+
         function entrarNoApp() {
-            document.getElementById('telaAuth').style.display = 'none';
-            document.getElementById('app').style.display = 'block';
+            document.getElementById('telaAuth').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
             buscarDados();
         }
 
@@ -130,11 +155,9 @@
 
         async function buscarDados() {
             const mesRef = document.getElementById('filtroMes').value;
-            const { data, error } = await supabaseClient.from('despesas').select('*');
-            if (!error) {
-                despesasDoMes = (data || []).filter(d => d.vencimento.startsWith(mesRef));
-                renderizar();
-            }
+            const { data } = await supabaseClient.from('despesas').select('*');
+            despesasDoMes = (data || []).filter(d => d.vencimento.startsWith(mesRef));
+            renderizar();
         }
 
         async function salvarLancamento() {
@@ -143,7 +166,6 @@
                 nome: document.getElementById('nome').value,
                 valor: parseFloat(document.getElementById('valor').value),
                 vencimento: `${document.getElementById('filtroMes').value}-${document.getElementById('vencimentoDia').value.padStart(2, '0')}`,
-                fixa: document.getElementById('checkFixa').checked
             };
             if (id) await supabaseClient.from('despesas').update(payload).eq('id', id);
             else await supabaseClient.from('despesas').insert([payload]);
@@ -170,11 +192,9 @@
             });
             document.getElementById('totalGeral').innerText = `R$ ${tG.toFixed(2)}`;
             document.getElementById('totalPago').innerText = `R$ ${tP.toFixed(2)}`;
-            document.getElementById('totalSobra').innerText = `R$ ${(salarioAtual - tG).toFixed(2)}`;
         }
 
         function toggleDarkMode() { document.getElementById('corpo').classList.toggle('dark'); }
-        function salvarSalario() { salarioAtual = document.getElementById('salarioInput').value; localStorage.setItem('salario', salarioAtual); renderizar(); }
         async function alternarStatus(id, status) { await supabaseClient.from('despesas').update({ paga: status }).eq('id', id); buscarDados(); }
         function editarItem(idx) {
             const item = despesasDoMes[idx];
@@ -182,7 +202,6 @@
             document.getElementById('nome').value = item.nome;
             document.getElementById('valor').value = item.valor;
             document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
-            document.getElementById('checkFixa').checked = item.fixa;
             document.getElementById('btnCancelar').classList.remove('hidden');
         }
         function cancelarEdicao() {
@@ -190,7 +209,6 @@
             document.getElementById('nome').value = '';
             document.getElementById('valor').value = '';
             document.getElementById('vencimentoDia').value = '';
-            document.getElementById('checkFixa').checked = false;
             document.getElementById('btnCancelar').classList.add('hidden');
         }
     </script>
