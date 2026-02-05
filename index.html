@@ -72,7 +72,7 @@
             <input type="hidden" id="editId">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
                 <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
-                <input type="number" id="valor" placeholder="Valor" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
+                <input type="text" id="valor" placeholder="Valor (ex: 123.45)" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50" oninput="formatarValor(this)">
                 <input type="number" id="vencimentoDia" placeholder="Dia" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
                 <button onclick="salvarLancamento()" id="btnSalvar" class="bg-blue-600 text-white px-4 py-3 rounded-xl font-black uppercase text-xs">Salvar</button>
             </div>
@@ -89,6 +89,7 @@
 
         let isLoginMode = true;
         let despesasDoMes = [];
+        let userId = null;
         document.getElementById('filtroMes').value = new Date().toISOString().substring(0, 7);
 
         function avisar(msg, tipo = 'info') {
@@ -110,9 +111,26 @@
             return "💰";
         }
 
+        function formatarValor(input) {
+            let valor = input.value.replace(/\D/g, '');
+            valor = (valor / 100).toFixed(2) + '';
+            valor = valor.replace(".", ",");
+            valor = valor.replace(/(\d)(?=(\d{3})+(?!\d))/g, "$1.");
+            input.value = valor ? `R$ ${valor}` : '';
+        }
+
+        function extrairValorFormatado(valorStr) {
+            return parseFloat(valorStr.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) || 0;
+        }
+
         // --- AUTH ---
-        supabaseClient.auth.onAuthStateChange((event, session) => {
-            if (session) entrarNoApp();
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (session) {
+                userId = session.user.id;
+                entrarNoApp();
+            } else {
+                userId = null;
+            }
         });
 
         async function gerenciarAuth() {
@@ -135,16 +153,19 @@
 
         // --- DADOS ---
         async function buscarDados() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
             const mesRef = document.getElementById('filtroMes').value;
-            const { data, error } = await supabaseClient.from('despesas').select('*');
+            const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
             if (error) return avisar("Erro ao carregar", "erro");
             despesasDoMes = data.filter(d => d.vencimento.startsWith(mesRef));
             renderizar();
         }
 
         async function importarFixas() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
             const mesAtual = document.getElementById('filtroMes').value;
-            const { data } = await supabaseClient.from('despesas').select('*');
+            const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            if (error) return avisar("Erro ao importar", "erro");
             
             // Filtra o que é FIXO e NÃO está no mês atual
             const fixasExistentes = data.filter(d => d.fixa === true);
@@ -162,7 +183,7 @@
                 await supabaseClient.from('despesas').insert([{
                     nome: item.nome, valor: item.valor, fixa: true, paga: false,
                     vencimento: `${mesAtual}-${dia}`,
-                    user_id: (await supabaseClient.auth.getUser()).data.user.id
+                    user_id: userId
                 }]);
             }
             avisar("Despesas fixas importadas!", "sucesso");
@@ -173,10 +194,12 @@
             const container = document.getElementById('listaContainer');
             container.innerHTML = '';
             let tG = 0, tP = 0;
+            const hoje = new Date().toISOString().split('T')[0];
             despesasDoMes.sort((a,b) => a.vencimento.localeCompare(b.vencimento)).forEach((item, idx) => {
                 tG += item.valor; if(item.paga) tP += item.valor;
+                const isAtrasada = !item.paga && item.vencimento < hoje;
                 const div = document.createElement('div');
-                div.className = `p-4 rounded-2xl bg-white border flex justify-between items-center ${item.paga ? 'opacity-50 grayscale' : 'shadow-sm'}`;
+                div.className = `p-4 rounded-2xl bg-white border flex justify-between items-center ${item.paga ? 'opacity-50 grayscale' : 'shadow-sm'} ${isAtrasada ? 'border-rose-600' : ''}`;
                 div.innerHTML = `
                     <div onclick="editarItem(${idx})" class="cursor-pointer flex items-center gap-3">
                         <span class="text-xl">${obterIcone(item.nome)}</span>
@@ -196,28 +219,44 @@
         }
 
         async function salvarLancamento() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
             const id = document.getElementById('editId').value;
-            const dia = document.getElementById('vencimentoDia').value.padStart(2, '0');
+            const dia = parseInt(document.getElementById('vencimentoDia').value);
+            const valorStr = document.getElementById('valor').value;
+            const valor = extrairValorFormatado(valorStr);
             const payload = {
                 nome: document.getElementById('nome').value,
-                valor: parseFloat(document.getElementById('valor').value) || 0,
-                vencimento: `${document.getElementById('filtroMes').value}-${dia}`,
+                valor: valor,
+                vencimento: `${document.getElementById('filtroMes').value}-${dia.toString().padStart(2, '0')}`,
                 fixa: document.getElementById('checkFixa').checked,
-                user_id: (await supabaseClient.auth.getUser()).data.user.id
+                user_id: userId
             };
-            if(!payload.nome || !dia) return avisar("Dados incompletos", "erro");
-            const { error } = id ? await supabaseClient.from('despesas').update(payload).eq('id', id) : await supabaseClient.from('despesas').insert([payload]);
+            if (!payload.nome) return avisar("Descrição obrigatória", "erro");
+            if (dia < 1 || dia > 31) return avisar("Dia inválido (1–31)", "erro");
+            if (payload.valor <= 0) return avisar("Valor deve ser maior que zero", "erro");
+            const { error } = id ? await supabaseClient.from('despesas').update(payload).eq('id', id).eq('user_id', userId) : await supabaseClient.from('despesas').insert([payload]);
             if (error) avisar(error.message, "erro"); else { cancelarEdicao(); buscarDados(); avisar("Salvo!", "sucesso"); }
         }
 
-        async function alternarStatus(id, status) { await supabaseClient.from('despesas').update({ paga: status }).eq('id', id); buscarDados(); }
-        async function remover(id) { if(confirm("Remover?")) { await supabaseClient.from('despesas').delete().eq('id', id); buscarDados(); } }
+        async function alternarStatus(id, status) { 
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            await supabaseClient.from('despesas').update({ paga: status }).eq('id', id).eq('user_id', userId); 
+            buscarDados(); 
+        }
+
+        async function remover(id) { 
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            if(confirm("Remover?")) { 
+                await supabaseClient.from('despesas').delete().eq('id', id).eq('user_id', userId); 
+                buscarDados(); 
+            } 
+        }
         
         function editarItem(idx) {
             const item = despesasDoMes[idx];
             document.getElementById('editId').value = item.id;
             document.getElementById('nome').value = item.nome;
-            document.getElementById('valor').value = item.valor;
+            document.getElementById('valor').value = `R$ ${item.valor.toFixed(2).replace('.', ',')}`;
             document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
             document.getElementById('checkFixa').checked = item.fixa;
             document.getElementById('btnCancelar').classList.remove('hidden');
