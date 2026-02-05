@@ -8,43 +8,90 @@
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         input::-webkit-outer-spin-button, input::-webkit-inner-spin-button { -webkit-appearance: none; margin: 0; }
-        .btn-pago { background-color: #10b981 !important; color: white; }
-        .btn-aberto { background-color: #ef4444 !important; color: white; }
+        .btn-pago { background-color: #10b981 !important; color: white; border-color: #10b981; }
+        .btn-aberto { background-color: #ef4444 !important; color: white; border-color: #ef4444; }
+        .progress-bar { transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1); }
     </style>
 </head>
-<body class="bg-slate-100 p-4 font-sans">
+<body class="bg-slate-100 min-h-screen p-4 font-sans text-slate-900">
     <div class="max-w-2xl mx-auto space-y-6">
-        <div class="bg-white rounded-2xl shadow-sm p-6 border-b-4 border-blue-600">
-            <h1 class="text-2xl font-black text-slate-800">Checklist de Contas</h1>
-            <p class="text-sm text-slate-500 font-medium italic">Sincronizado com Supabase</p>
+        <div class="bg-white rounded-2xl shadow-sm p-6 flex flex-col md:flex-row justify-between items-center gap-4 border-b-4 border-blue-600">
+            <div>
+                <h1 class="text-2xl font-black tracking-tight text-slate-800">Checklist de Contas</h1>
+                <p class="text-sm text-slate-500 font-medium italic">Sincronizado com Supabase</p>
+            </div>
+            <div class="flex items-center gap-3 bg-slate-50 p-2 rounded-xl border border-slate-200">
+                <span class="text-[10px] font-bold text-slate-400 uppercase ml-2">Mês Ref.</span>
+                <input type="month" id="filtroMes" onchange="buscarDados()" class="bg-transparent font-bold text-blue-600 focus:outline-none cursor-pointer">
+            </div>
+        </div>
+
+        <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200">
+            <div class="flex justify-between mb-2">
+                <span class="text-[10px] font-bold text-slate-400 uppercase">Progresso de Pagamento</span>
+                <span id="porcentagemTexto" class="text-[10px] font-bold text-blue-600 uppercase">0%</span>
+            </div>
+            <div class="w-full bg-slate-100 rounded-full h-2.5">
+                <div id="progressBar" class="bg-blue-600 h-2.5 rounded-full progress-bar" style="width: 0%"></div>
+            </div>
+        </div>
+
+        <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <div class="bg-white p-4 rounded-2xl shadow-sm border border-slate-200 text-center">
+                <p class="text-[10px] text-slate-400 font-bold uppercase mb-1">Total do Mês</p>
+                <p id="totalGeral" class="text-xl font-black text-slate-700">R$ 0,00</p>
+            </div>
+            <div class="bg-emerald-50 p-4 rounded-2xl shadow-sm border border-emerald-100 text-center">
+                <p class="text-[10px] text-emerald-600 font-bold uppercase mb-1">Total Pago</p>
+                <p id="totalPago" class="text-xl font-black text-emerald-700">R$ 0,00</p>
+            </div>
+            <div class="bg-rose-50 p-4 rounded-2xl shadow-sm border border-rose-100 text-center">
+                <p class="text-[10px] text-rose-600 font-bold uppercase mb-1">Pendente</p>
+                <p id="totalRestante" class="text-xl font-black text-rose-700">R$ 0,00</p>
+            </div>
         </div>
 
         <div class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
             <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
-                <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500">
-                <input type="number" id="valor" placeholder="R$ Valor" class="border rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500">
-                <input type="number" id="vencimentoDia" placeholder="Dia" min="1" max="31" class="border rounded-xl px-4 py-2 outline-none focus:ring-2 focus:ring-blue-500">
-                <button onclick="salvarLancamento()" class="bg-blue-600 text-white px-4 py-2 rounded-xl font-bold hover:bg-blue-700 uppercase text-sm">Salvar</button>
+                <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="number" id="valor" placeholder="R$ Valor" class="border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                <input type="number" id="vencimentoDia" placeholder="Dia" min="1" max="31" class="border rounded-xl px-4 py-2.5 text-sm outline-none focus:ring-2 focus:ring-blue-500">
+                <button onclick="salvarLancamento()" class="bg-blue-600 text-white px-4 py-2.5 rounded-xl font-bold hover:bg-blue-700 transition uppercase text-sm shadow-md">Salvar</button>
             </div>
         </div>
 
         <div id="listaContainer" class="space-y-3 pb-12">
-            <p class="text-center text-slate-400 uppercase text-xs font-bold">Carregando dados...</p>
+            <div class="text-center py-10">
+                <div class="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div>
+                <p class="text-slate-400 text-xs mt-2 font-bold uppercase">Sincronizando...</p>
+            </div>
         </div>
     </div>
 
     <script>
-        const _URL = "https://hzfjdtpllocdbeqsxhly.supabase.co";
+        // CONFIGURAÇÃO VALIDADA NA ETAPA ANTERIOR
+        const _URL = "https://hzfjdtpllocdbeqsxhly.supabase.co"; 
         const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6ZmpkdHBsbG9jZGJlcXN4aGx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyOTkxOTYsImV4cCI6MjA4NTg3NTE5Nn0.-4mugGyPB6ozbtTSgjRd_buHea3m9rf-yRnxz7BY6CA";
         const supabaseClient = supabase.createClient(_URL, _KEY);
 
+        let despesasDoMes = [];
+        const filtroMes = document.getElementById('filtroMes');
+        filtroMes.value = new Date().toISOString().substring(0, 7);
+
         async function buscarDados() {
-            const { data, error } = await supabaseClient.from('despesas').select('*').order('vencimento', { ascending: true });
+            const mesRef = filtroMes.value;
+            const { data, error } = await supabaseClient
+                .from('despesas')
+                .select('*')
+                .filter('vencimento', 'gte', `${mesRef}-01`)
+                .filter('vencimento', 'lte', `${mesRef}-31`);
+
             if (error) {
                 console.error(error);
-                document.getElementById('listaContainer').innerHTML = "Erro ao carregar lista.";
+                document.getElementById('listaContainer').innerHTML = "<p class='text-center text-red-500'>Erro ao carregar dados.</p>";
             } else {
-                renderizar(data);
+                despesasDoMes = data || [];
+                renderizar();
             }
         }
 
@@ -52,15 +99,15 @@
             const nome = document.getElementById('nome').value;
             const valor = parseFloat(document.getElementById('valor').value);
             const dia = document.getElementById('vencimentoDia').value;
-            const mesAtual = new Date().toISOString().substring(0, 7);
+            const mesRef = filtroMes.value;
 
-            if (!nome || !valor || !dia) return alert("Preencha tudo!");
+            if (!nome || !valor || !dia) return alert("Preencha todos os campos!");
 
             const { error } = await supabaseClient.from('despesas').insert([{
-                nome, valor, vencimento: `${mesAtual}-${dia.padStart(2, '0')}`, paga: false
+                nome, valor, vencimento: `${mesRef}-${dia.padStart(2, '0')}`, paga: false
             }]);
 
-            if (error) alert("Erro ao salvar!");
+            if (error) alert("Erro ao salvar! Verifique se a tabela existe.");
             else {
                 document.getElementById('nome').value = '';
                 document.getElementById('valor').value = '';
@@ -75,33 +122,52 @@
         }
 
         async function excluir(id) {
-            if (confirm("Excluir conta?")) {
+            if (confirm("Excluir esta conta permanentemente?")) {
                 await supabaseClient.from('despesas').delete().eq('id', id);
                 buscarDados();
             }
         }
 
-        function renderizar(dados) {
+        function renderizar() {
             const container = document.getElementById('listaContainer');
-            container.innerHTML = dados.length === 0 ? '<p class="text-center text-slate-400">Nenhuma conta lançada.</p>' : '';
+            container.innerHTML = despesasDoMes.length === 0 ? '<p class="text-center text-slate-400 py-10 font-medium">Nenhum lançamento para este mês.</p>' : '';
             
-            dados.forEach(item => {
+            let total = 0, pago = 0;
+
+            despesasDoMes.sort((a, b) => a.vencimento.localeCompare(b.vencimento)).forEach(item => {
+                total += item.valor;
+                if (item.paga) pago += item.valor;
+
                 const div = document.createElement('div');
-                div.className = `bg-white p-4 rounded-xl shadow-sm border-l-4 flex justify-between items-center ${item.paga ? 'border-emerald-500' : 'border-rose-500'}`;
+                div.className = `bg-white p-4 rounded-xl shadow-sm border-l-4 flex justify-between items-center transition-all ${item.paga ? 'border-emerald-500 opacity-75' : 'border-rose-500'}`;
                 div.innerHTML = `
                     <div>
                         <p class="font-bold text-slate-700">${item.nome}</p>
-                        <p class="text-xs text-slate-400 font-bold uppercase">Dia ${item.vencimento.split('-')[2]} • R$ ${item.valor.toFixed(2)}</p>
+                        <p class="text-[10px] text-slate-400 font-bold uppercase">Dia ${item.vencimento.split('-')[2]} • R$ ${item.valor.toFixed(2).replace('.', ',')}</p>
                     </div>
-                    <div class="flex gap-2">
-                        <button onclick="alternarStatus('${item.id}', ${item.paga})" class="px-3 py-1 rounded-lg text-[10px] font-bold uppercase ${item.paga ? 'btn-pago' : 'btn-aberto'}">
+                    <div class="flex items-center gap-3">
+                        <button onclick="alternarStatus('${item.id}', ${item.paga})" class="px-4 py-1.5 rounded-lg text-[10px] font-bold uppercase transition-colors ${item.paga ? 'btn-pago' : 'btn-aberto'}">
                             ${item.paga ? 'Pago' : 'Aberto'}
                         </button>
-                        <button onclick="excluir('${item.id}')" class="text-slate-300 hover:text-rose-500 text-xs font-bold">X</button>
+                        <button onclick="excluir('${item.id}')" class="text-slate-300 hover:text-rose-500 transition-colors">
+                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
+                            </svg>
+                        </button>
                     </div>
                 `;
                 container.appendChild(div);
             });
+
+            // Atualiza os contadores
+            document.getElementById('totalGeral').innerText = `R$ ${total.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalPago').innerText = `R$ ${pago.toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            document.getElementById('totalRestante').innerText = `R$ ${(total - pago).toLocaleString('pt-BR', {minimumFractionDigits: 2})}`;
+            
+            // Atualiza progresso
+            const porc = total > 0 ? (pago / total) * 100 : 0;
+            document.getElementById('progressBar').style.width = porc + '%';
+            document.getElementById('porcentagemTexto').innerText = Math.round(porc) + '%';
         }
 
         buscarDados();
