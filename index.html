@@ -6,6 +6,10 @@
     <title>Financeiro Pro - Versão Melhorada</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
+    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .dark { background-color: #0f172a; color: #f8fafc; }
         .dark .bg-white { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
@@ -23,6 +27,10 @@
         .password-container { position: relative; }
         .password-container input { padding-right: 2.5rem; }
         .password-toggle { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); cursor: pointer; }
+        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 150; }
+        .modal-content { background: white; padding: 2rem; border-radius: 1rem; max-width: 80%; max-height: 80%; overflow: auto; }
+        .dark .modal-content { background: #1e293b; color: #f1f5f9; }
+        .progress-bar { height: 8px; border-radius: 999px; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4 font-sans" id="corpo">
@@ -62,11 +70,11 @@
                     <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Mês de Referência</p>
                     <input type="month" id="filtroMes" onchange="buscarDados()" class="bg-slate-50 border rounded-xl font-black text-blue-600 text-xl p-3 w-full outline-none">
                 </div>
-                <button onclick="importarDoMesAnterior()" class="w-full md:w-auto bg-slate-900 text-white px-6 py-4 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition">📥 Importar do Mês Anterior</button>
+                <button onclick="prepararImportarDoMesAnterior()" class="w-full md:w-auto bg-slate-900 text-white px-6 py-4 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition">📥 Importar do Mês Anterior</button>
             </div>
         </div>
 
-        <div class="grid grid-cols-3 gap-4">
+        <div class="grid grid-cols-4 gap-4">
             <div class="bg-white p-5 rounded-2xl border text-center">
                 <p class="text-[10px] text-slate-400 font-bold uppercase">Total Geral</p>
                 <p id="totalGeral" class="text-xl font-black">R$ 0,00</p>
@@ -79,35 +87,85 @@
                 <p class="text-[10px] font-bold uppercase opacity-80">Restante</p>
                 <p id="totalRestante" class="text-xl font-black">R$ 0,00</p>
             </div>
+            <div class="bg-blue-500 p-5 rounded-2xl text-white text-center">
+                <p class="text-[10px] font-bold uppercase opacity-80">Progresso</p>
+                <div id="progressContainer" class="mt-2 bg-white rounded-full p-1">
+                    <div id="progressBar" class="progress-bar bg-emerald-500 w-0"></div>
+                </div>
+            </div>
         </div>
 
         <div id="boxForm" class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
             <div class="flex justify-between items-center mb-4">
                 <h2 id="formTitulo" class="font-bold uppercase text-xs text-slate-400">Novo Lançamento</h2>
                 <label class="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" id="checkFixa" class="w-4 h-4"> Despesa Fixa
+                    <input type="checkbox" id="checkFixa" class="w-4 h-4" onchange="toggleFixaOptions()"> Despesa Fixa
                 </label>
             </div>
             <input type="hidden" id="editId">
             <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
                 <select id="categoria" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
                     <option value="">Selecione Categoria</option>
-                    <option value="Energia">⚡ Energia</option>
-                    <option value="Água">💧 Água</option>
-                    <option value="Internet">🌐 Internet</option>
-                    <option value="Aluguel">🏠 Aluguel</option>
-                    <option value="Mercado">🛒 Mercado</option>
-                    <option value="Outros">💰 Outros</option>
+                    <option value="Energia"><i class="fas fa-bolt"></i> Energia</option>
+                    <option value="Água"><i class="fas fa-tint"></i> Água</option>
+                    <option value="Internet"><i class="fas fa-wifi"></i> Internet</option>
+                    <option value="Aluguel"><i class="fas fa-home"></i> Aluguel</option>
+                    <option value="Mercado"><i class="fas fa-shopping-cart"></i> Mercado</option>
+                    <option value="Outros"><i class="fas fa-money-bill"></i> Outros</option>
                 </select>
                 <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
                 <input type="text" id="valor" placeholder="Valor (ex: 123.45)" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50" oninput="formatarValor(this)">
                 <input type="number" id="vencimentoDia" placeholder="Dia" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
                 <button onclick="salvarLancamento()" id="btnSalvar" class="bg-blue-600 text-white px-4 py-3 rounded-xl font-black uppercase text-xs">Salvar</button>
             </div>
+            <div id="parcelasOptions" class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 hidden">
+                <input type="number" id="numParcelas" placeholder="Nº de Parcelas (1 para única)" min="1" value="1" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
+                <input type="number" id="intervaloMeses" placeholder="Intervalo em Meses" min="1" value="1" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
+            </div>
+            <div id="fixaOptions" class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 hidden">
+                <input type="number" id="diaPadrao" placeholder="Dia Padrão (1-31)" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
+                <input type="text" id="valorPadrao" placeholder="Valor Padrão" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50" oninput="formatarValor(this)">
+            </div>
             <button onclick="cancelarEdicao()" id="btnCancelar" class="hidden w-full mt-2 text-rose-500 text-[10px] font-bold uppercase">Cancelar Edição</button>
         </div>
 
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
+            <div class="flex flex-col md:flex-row gap-4">
+                <input type="text" id="buscaDespesa" placeholder="Buscar por nome..." class="flex-1 border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50" oninput="filtrarLista()">
+                <select id="filtroStatus" onchange="filtrarLista()" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
+                    <option value="todos">Todos</option>
+                    <option value="pagas">Pagas</option>
+                    <option value="abertas">Abertas</option>
+                    <option value="atrasadas">Atrasadas</option>
+                </select>
+                <button onclick="exportarCSV()" class="bg-indigo-600 text-white px-6 py-4 rounded-xl text-[10px] font-black uppercase">Exportar CSV</button>
+                <button onclick="exportarPDF()" class="bg-purple-600 text-white px-6 py-4 rounded-xl text-[10px] font-black uppercase">Exportar PDF</button>
+                <button onclick="mostrarRelatorio()" class="bg-teal-600 text-white px-6 py-4 rounded-xl text-[10px] font-black uppercase">Relatório</button>
+            </div>
+        </div>
+
         <div id="listaContainer" class="space-y-3 pb-20"></div>
+    </div>
+
+    <!-- Modal para Importação -->
+    <div id="modalImport" class="modal hidden">
+        <div class="modal-content">
+            <h2 class="text-xl font-bold mb-4">Itens a Importar</h2>
+            <ul id="listaImport" class="space-y-2 mb-4"></ul>
+            <div class="flex gap-4">
+                <button onclick="confirmarImportar()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl">Confirmar</button>
+                <button onclick="fecharModal('modalImport')" class="bg-rose-600 text-white px-4 py-2 rounded-xl">Cancelar</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Modal para Relatório -->
+    <div id="modalRelatorio" class="modal hidden">
+        <div class="modal-content w-full max-w-lg">
+            <h2 class="text-xl font-bold mb-4">Relatório Mensal</h2>
+            <canvas id="chartCategorias" height="200"></canvas>
+            <button onclick="fecharModal('modalRelatorio')" class="mt-4 bg-rose-600 text-white px-4 py-2 rounded-xl">Fechar</button>
+        </div>
     </div>
 
     <script>
@@ -117,7 +175,9 @@
 
         let isLoginMode = true;
         let despesasDoMes = [];
+        let despesasFiltradas = [];
         let userId = null;
+        let itensParaImportar = [];
         document.getElementById('filtroMes').value = new Date().toISOString().substring(0, 7);
 
         // Verificar preferência de dark mode
@@ -142,6 +202,12 @@
             }
         }
 
+        function toggleFixaOptions() {
+            const isFixa = document.getElementById('checkFixa').checked;
+            document.getElementById('fixaOptions').classList.toggle('hidden', !isFixa);
+            document.getElementById('parcelasOptions').classList.toggle('hidden', isFixa); // Parcelas só para não fixas
+        }
+
         function avisar(msg, tipo = 'info') {
             const cores = { erro: 'bg-rose-600', sucesso: 'bg-emerald-600', info: 'bg-blue-600' };
             const toast = document.createElement('div');
@@ -153,24 +219,24 @@
 
         function obterIcone(categoria, nome) {
             const icons = {
-                "Energia": "⚡",
-                "Água": "💧",
-                "Internet": "🌐",
-                "Aluguel": "🏠",
-                "Mercado": "🛒",
-                "Outros": "💰"
+                "Energia": '<i class="fas fa-bolt"></i>',
+                "Água": '<i class="fas fa-tint"></i>',
+                "Internet": '<i class="fas fa-wifi"></i>',
+                "Aluguel": '<i class="fas fa-home"></i>',
+                "Mercado": '<i class="fas fa-shopping-cart"></i>',
+                "Outros": '<i class="fas fa-money-bill"></i>'
             };
             return icons[categoria] || obterIconePorNome(nome);
         }
 
         function obterIconePorNome(nome) {
             const n = nome.toLowerCase();
-            if(n.includes("luz") || n.includes("ener")) return "⚡";
-            if(n.includes("agua")) return "💧";
-            if(n.includes("net") || n.includes("wifi")) return "🌐";
-            if(n.includes("aluguel")) return "🏠";
-            if(n.includes("mercado") || n.includes("compr")) return "🛒";
-            return "💰";
+            if(n.includes("luz") || n.includes("ener")) return '<i class="fas fa-bolt"></i>';
+            if(n.includes("agua")) return '<i class="fas fa-tint"></i>';
+            if(n.includes("net") || n.includes("wifi")) return '<i class="fas fa-wifi"></i>';
+            if(n.includes("aluguel")) return '<i class="fas fa-home"></i>';
+            if(n.includes("mercado") || n.includes("compr")) return '<i class="fas fa-shopping-cart"></i>';
+            return '<i class="fas fa-money-bill"></i>';
         }
 
         function formatarValor(input) {
@@ -234,64 +300,76 @@
             // Recarregar após adicionar
             const { data: updatedData } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
             despesasDoMes = updatedData.filter(d => d.vencimento.startsWith(mesRef));
+            despesasFiltradas = [...despesasDoMes];
             renderizar();
         }
 
+        function ajustarDiaParaMes(mesAtual, dia) {
+            const [ano, mes] = mesAtual.split('-').map(Number);
+            const ultimoDia = new Date(ano, mes, 0).getDate();
+            return Math.min(dia, ultimoDia);
+        }
+
         async function adicionarFixasAutomaticamente(mesAtual, allData) {
-            // Encontrar todas as fixas únicas (por nome) de qualquer mês
             const fixasExistentes = allData.filter(d => d.fixa === true);
             const nomesFixosUnicos = [...new Set(fixasExistentes.map(d => d.nome))];
 
-            // Nomes já no mês atual
             const nomesNoMesAtual = allData.filter(d => d.vencimento.startsWith(mesAtual)).map(d => d.nome);
 
-            // Fixas que faltam no mês atual
             const paraAdicionar = nomesFixosUnicos.filter(nome => !nomesNoMesAtual.includes(nome));
 
             if (paraAdicionar.length === 0) return;
 
             for (let nome of paraAdicionar) {
-                // Pegar a última instância dessa fixa para copiar valor e dia
                 const ultimaFixa = fixasExistentes.filter(d => d.nome === nome).sort((a, b) => b.vencimento.localeCompare(a.vencimento))[0];
                 if (!ultimaFixa) continue;
-                const dia = ultimaFixa.vencimento.split('-')[2];
+                let dia = ultimaFixa.vencimento.split('-')[2];
+                dia = ajustarDiaParaMes(mesAtual, dia);
                 await supabaseClient.from('despesas').insert([{
                     nome: nome,
                     valor: ultimaFixa.valor,
                     fixa: true,
                     paga: false,
-                    vencimento: `${mesAtual}-${dia}`,
+                    vencimento: `${mesAtual}-${dia.toString().padStart(2, '0')}`,
                     user_id: userId,
-                    categoria: ultimaFixa.categoria || '' // Adicionando categoria
+                    categoria: ultimaFixa.categoria || ''
                 }]);
             }
             avisar("Despesas fixas adicionadas automaticamente!", "sucesso");
         }
 
-        async function importarDoMesAnterior() {
+        async function prepararImportarDoMesAnterior() {
             if (!userId) return avisar("Usuário não autenticado", "erro");
             const mesAtual = document.getElementById('filtroMes').value;
             const [ano, mes] = mesAtual.split('-').map(Number);
-            const mesAnterior = new Date(ano, mes - 2, 1).toISOString().substring(0, 7); // Mês anterior
+            const mesAnterior = new Date(ano, mes - 2, 1).toISOString().substring(0, 7);
 
             const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
             if (error) return avisar("Erro ao importar", "erro");
 
-            // Não fixas do mês anterior
             const naoFixasAnterior = data.filter(d => !d.fixa && d.vencimento.startsWith(mesAnterior));
 
-            // Nomes já no mês atual
             const nomesNoMesAtual = data.filter(d => d.vencimento.startsWith(mesAtual)).map(d => d.nome);
 
-            // Filtrar as que não existem no atual
-            const paraImportar = naoFixasAnterior.filter(f => !nomesNoMesAtual.includes(f.nome));
+            itensParaImportar = naoFixasAnterior.filter(f => !nomesNoMesAtual.includes(f.nome));
 
-            // Remove duplicatas (por nome)
-            const unicas = [...new Map(paraImportar.map(item => [item.nome, item])).values()];
+            const unicas = [...new Map(itensParaImportar.map(item => [item.nome, item])).values()];
 
             if (unicas.length === 0) return avisar("Nenhuma despesa não fixa do mês anterior para importar.", "info");
 
-            for (let item of unicas) {
+            const lista = document.getElementById('listaImport');
+            lista.innerHTML = '';
+            unicas.forEach(item => {
+                const li = document.createElement('li');
+                li.innerText = `${item.nome} - R$ ${item.valor.toFixed(2)}`;
+                lista.appendChild(li);
+            });
+            document.getElementById('modalImport').classList.remove('hidden');
+        }
+
+        async function confirmarImportar() {
+            const mesAtual = document.getElementById('filtroMes').value;
+            for (let item of itensParaImportar) {
                 const dia = item.vencimento.split('-')[2];
                 await supabaseClient.from('despesas').insert([{
                     nome: item.nome,
@@ -303,8 +381,29 @@
                     categoria: item.categoria || ''
                 }]);
             }
+            fecharModal('modalImport');
             avisar("Despesas do mês anterior importadas!", "sucesso");
             buscarDados();
+        }
+
+        function fecharModal(id) {
+            document.getElementById(id).classList.add('hidden');
+        }
+
+        function filtrarLista() {
+            const busca = document.getElementById('buscaDespesa').value.toLowerCase();
+            const status = document.getElementById('filtroStatus').value;
+            const hoje = new Date().toISOString().split('T')[0];
+
+            despesasFiltradas = despesasDoMes.filter(item => {
+                const matchBusca = item.nome.toLowerCase().includes(busca);
+                let matchStatus = true;
+                if (status === 'pagas') matchStatus = item.paga;
+                else if (status === 'abertas') matchStatus = !item.paga;
+                else if (status === 'atrasadas') matchStatus = !item.paga && item.vencimento < hoje;
+                return matchBusca && matchStatus;
+            });
+            renderizar();
         }
 
         function renderizar() {
@@ -312,7 +411,7 @@
             container.innerHTML = '';
             let tG = 0, tP = 0;
             const hoje = new Date().toISOString().split('T')[0];
-            despesasDoMes.sort((a,b) => a.vencimento.localeCompare(b.vencimento)).forEach((item, idx) => {
+            despesasFiltradas.sort((a,b) => a.vencimento.localeCompare(b.vencimento)).forEach((item, idx) => {
                 tG += item.valor; if(item.paga) tP += item.valor;
                 const isAtrasada = !item.paga && item.vencimento < hoje;
                 const div = document.createElement('div');
@@ -335,6 +434,13 @@
             document.getElementById('totalGeral').innerText = `R$ ${tG.toFixed(2)}`;
             document.getElementById('totalPago').innerText = `R$ ${tP.toFixed(2)}`;
             document.getElementById('totalRestante').innerText = `R$ ${(tG - tP).toFixed(2)}`;
+
+            const percent = tG > 0 ? (tP / tG) * 100 : 0;
+            const bar = document.getElementById('progressBar');
+            bar.style.width = `${percent}%`;
+            if (percent > 80) bar.className = 'progress-bar bg-emerald-500';
+            else if (percent > 50) bar.className = 'progress-bar bg-amber-500';
+            else bar.className = 'progress-bar bg-rose-500';
         }
 
         async function salvarLancamento() {
@@ -344,19 +450,40 @@
             const valorStr = document.getElementById('valor').value;
             const valor = extrairValorFormatado(valorStr);
             const categoria = document.getElementById('categoria').value;
-            const payload = {
-                nome: document.getElementById('nome').value,
-                valor: valor,
-                vencimento: `${document.getElementById('filtroMes').value}-${dia.toString().padStart(2, '0')}`,
-                fixa: document.getElementById('checkFixa').checked,
-                user_id: userId,
-                categoria: categoria
-            };
-            if (!payload.nome) return avisar("Descrição obrigatória", "erro");
+            const isFixa = document.getElementById('checkFixa').checked;
+            const numParcelas = parseInt(document.getElementById('numParcelas').value) || 1;
+            const intervaloMeses = parseInt(document.getElementById('intervaloMeses').value) || 1;
+            const nomeBase = document.getElementById('nome').value;
+
+            if (!nomeBase) return avisar("Descrição obrigatória", "erro");
             if (dia < 1 || dia > 31) return avisar("Dia inválido (1–31)", "erro");
-            if (payload.valor <= 0) return avisar("Valor deve ser maior que zero", "erro");
-            const { error } = id ? await supabaseClient.from('despesas').update(payload).eq('id', id).eq('user_id', userId) : await supabaseClient.from('despesas').insert([payload]);
-            if (error) avisar(error.message, "erro"); else { cancelarEdicao(); buscarDados(); avisar("Salvo!", "sucesso"); }
+            if (valor <= 0) return avisar("Valor deve ser maior que zero", "erro");
+
+            let mesAtual = document.getElementById('filtroMes').value;
+            const valorParcela = valor / numParcelas;
+
+            for (let i = 0; i < numParcelas; i++) {
+                const [ano, mes] = mesAtual.split('-').map(Number);
+                const diaAjustado = ajustarDiaParaMes(mesAtual, dia);
+                const payload = {
+                    nome: numParcelas > 1 ? `${nomeBase} (${i+1}/${numParcelas})` : nomeBase,
+                    valor: valorParcela,
+                    vencimento: `${mesAtual}-${diaAjustado.toString().padStart(2, '0')}`,
+                    fixa: isFixa,
+                    user_id: userId,
+                    categoria: categoria
+                };
+                if (id && i === 0) { // Editar só a primeira se editando
+                    await supabaseClient.from('despesas').update(payload).eq('id', id).eq('user_id', userId);
+                } else {
+                    await supabaseClient.from('despesas').insert([payload]);
+                }
+                // Avançar mês para próxima parcela
+                mesAtual = new Date(ano, mes + intervaloMeses - 1, 1).toISOString().substring(0, 7);
+            }
+            cancelarEdicao();
+            buscarDados();
+            avisar("Salvo!", "sucesso");
         }
 
         async function alternarStatus(id, status) { 
@@ -374,13 +501,15 @@
         }
         
         function editarItem(idx) {
-            const item = despesasDoMes[idx];
+            const item = despesasFiltradas[idx];
             document.getElementById('editId').value = item.id;
             document.getElementById('nome').value = item.nome;
             document.getElementById('valor').value = `R$ ${item.valor.toFixed(2).replace('.', ',')}`;
             document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
             document.getElementById('checkFixa').checked = item.fixa;
             document.getElementById('categoria').value = item.categoria || '';
+            document.getElementById('numParcelas').value = 1; // Reset parcelas
+            toggleFixaOptions();
             document.getElementById('btnCancelar').classList.remove('hidden');
         }
 
@@ -391,7 +520,56 @@
             document.getElementById('vencimentoDia').value = '';
             document.getElementById('checkFixa').checked = false;
             document.getElementById('categoria').value = '';
+            document.getElementById('numParcelas').value = 1;
+            document.getElementById('intervaloMeses').value = 1;
+            document.getElementById('fixaOptions').classList.add('hidden');
+            document.getElementById('parcelasOptions').classList.add('hidden');
             document.getElementById('btnCancelar').classList.add('hidden');
+        }
+
+        function exportarCSV() {
+            const data = despesasDoMes.map(item => ({
+                Nome: item.nome,
+                Valor: item.valor,
+                Vencimento: item.vencimento,
+                Paga: item.paga ? 'Sim' : 'Não',
+                Categoria: item.categoria
+            }));
+            const csv = Papa.unparse(data);
+            const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+            const link = document.createElement('a');
+            link.href = URL.createObjectURL(blob);
+            link.download = 'despesas.csv';
+            link.click();
+        }
+
+        function exportarPDF() {
+            const { jsPDF } = window.jspdf;
+            const doc = new jsPDF();
+            doc.text('Despesas', 10, 10);
+            let y = 20;
+            despesasDoMes.forEach(item => {
+                doc.text(`${item.nome}: R$ ${item.valor.toFixed(2)} - ${item.vencimento} - ${item.paga ? 'Paga' : 'Aberta'}`, 10, y);
+                y += 10;
+            });
+            doc.save('despesas.pdf');
+        }
+
+        function mostrarRelatorio() {
+            const ctx = document.getElementById('chartCategorias').getContext('2d');
+            const categorias = {};
+            despesasDoMes.forEach(item => {
+                const cat = item.categoria || 'Outros';
+                categorias[cat] = (categorias[cat] || 0) + item.valor;
+            });
+            new Chart(ctx, {
+                type: 'pie',
+                data: {
+                    labels: Object.keys(categorias),
+                    datasets: [{ data: Object.values(categorias), backgroundColor: ['#ef4444', '#eab308', '#22c55e', '#3b82f6', '#a855f7'] }]
+                }
+            });
+            document.getElementById('modalRelatorio').classList.remove('hidden');
         }
     </script>
 </body>
