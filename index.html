@@ -11,13 +11,9 @@
         .dark .bg-white { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
         #telaAuth { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
         .fixo-tag { background-color: #eff6ff; color: #1d4ed8; font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 800; border: 1px solid #dbeafe; text-transform: uppercase; }
-        .dark .fixo-tag { background-color: #1e40af; color: #bfdbfe; border-color: #1e40af; }
         .hidden { display: none !important; }
         @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .toast-anim { animation: slideUp 0.3s ease-out; }
-        .password-container { position: relative; }
-        .password-container input { padding-right: 2.5rem; }
-        .password-toggle { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); cursor: pointer; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4 font-sans" id="corpo">
@@ -26,27 +22,9 @@
         <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm">
             <h2 id="authTitulo" class="text-2xl font-black mb-6 text-center text-slate-800">Financeiro Pro</h2>
             <form id="camposAuth" onsubmit="return false;" autocomplete="off" class="space-y-4">
-                <!-- Anti-autofill: campos falsos + autocomplete off -->
-                <input style="display:none" type="text" name="fake_user" autocomplete="off"/>
-                <input style="display:none" type="password" name="fake_password" autocomplete="off"/>
-                
-                <input 
-                    type="email" 
-                    id="u_mail" 
-                    placeholder="E-mail" 
-                    class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                    autocomplete="off"
-                >
-                <div class="password-container">
-                    <input 
-                        type="password" 
-                        id="u_pass" 
-                        placeholder="Senha" 
-                        class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50"
-                        autocomplete="new-password"
-                    >
-                    <span class="password-toggle text-slate-400" onclick="togglePassword()">👁️</span>
-                </div>
+                <input style="display:none" type="text" name="fake_user"/><input style="display:none" type="password" name="fake_password"/>
+                <input type="email" id="u_mail" placeholder="E-mail" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" autocomplete="new-password">
+                <input type="text" id="u_pass" placeholder="Senha" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" autocomplete="new-password" onfocus="this.type='password'">
                 <button onclick="gerenciarAuth()" id="btnPrincipal" class="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase shadow-lg">Entrar</button>
                 <button type="button" onclick="alternarAuth()" id="btnTroca" class="w-full text-xs font-bold text-slate-400 uppercase mt-2">Criar conta / Login</button>
             </form>
@@ -145,8 +123,8 @@
             return parseFloat(valorStr.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) || 0;
         }
 
+        // --- AUTH ---
         supabaseClient.auth.onAuthStateChange(async (event, session) => {
-            console.log("Auth state mudou:", event, session ? "sessão existe" : "sem sessão");
             if (session) {
                 userId = session.user.id;
                 entrarNoApp();
@@ -156,73 +134,188 @@
         });
 
         async function gerenciarAuth() {
-            const email = document.getElementById('u_mail').value.trim();
+            const email = document.getElementById('u_mail').value;
             const password = document.getElementById('u_pass').value;
-
-            console.log("Tentando login/cadastro:", { email, isLoginMode });
-
-            if (!email || !password) {
-                avisar("Preencha e-mail e senha", "erro");
-                return;
-            }
-
-            let result;
-            if (isLoginMode) {
-                result = await supabaseClient.auth.signInWithPassword({ email, password });
-            } else {
-                result = await supabaseClient.auth.signUp({ email, password });
-            }
-
-            const { data, error } = result;
-
-            console.log("Resposta Supabase:", { data, error });
-
-            if (error) {
-                console.error("Erro detalhado:", error);
-                avisar(error.message || "Erro ao autenticar", "erro");
-                return;
-            }
-
-            // Sucesso: força verificação da sessão
-            const { data: sessionData } = await supabaseClient.auth.getSession();
-            console.log("Sessão após auth:", sessionData);
-            if (sessionData?.session) {
-                userId = sessionData.session.user.id;
-                entrarNoApp();
-            } else {
-                avisar("Login ok, mas sessão não detectada. Tente novamente.", "erro");
-            }
+            const { error } = isLoginMode 
+                ? await supabaseClient.auth.signInWithPassword({ email, password })
+                : await supabaseClient.auth.signUp({ email, password });
+            if (error) avisar(error.message, "erro");
         }
 
         function entrarNoApp() {
-            console.log("Entrando no app - userId:", userId);
             document.getElementById('telaAuth').classList.add('hidden');
             document.getElementById('app').classList.remove('hidden');
             buscarDados();
         }
 
-        async function logout() { 
-            await supabaseClient.auth.signOut(); 
-            localStorage.clear(); 
-            location.reload(); 
+        async function logout() { await supabaseClient.auth.signOut(); localStorage.clear(); location.reload(); }
+        function alternarAuth() { isLoginMode = !isLoginMode; document.getElementById('authTitulo').innerText = isLoginMode ? 'Financeiro Pro' : 'Nova Conta'; }
+
+        // --- DADOS ---
+        async function buscarDados() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            const mesRef = document.getElementById('filtroMes').value;
+            const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            if (error) return avisar("Erro ao carregar", "erro");
+            despesasDoMes = data.filter(d => d.vencimento.startsWith(mesRef));
+
+            // Adicionar fixas automaticamente se não existirem no mês atual
+            await adicionarFixasAutomaticamente(mesRef, data);
+
+            // Recarregar após adicionar
+            const { data: updatedData } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            despesasDoMes = updatedData.filter(d => d.vencimento.startsWith(mesRef));
+            renderizar();
         }
 
-        function alternarAuth() { 
-            isLoginMode = !isLoginMode; 
-            document.getElementById('authTitulo').innerText = isLoginMode ? 'Financeiro Pro' : 'Nova Conta'; 
+        async function adicionarFixasAutomaticamente(mesAtual, allData) {
+            // Encontrar todas as fixas únicas (por nome) de qualquer mês
+            const fixasExistentes = allData.filter(d => d.fixa === true);
+            const nomesFixosUnicos = [...new Set(fixasExistentes.map(d => d.nome))];
+
+            // Nomes já no mês atual
+            const nomesNoMesAtual = allData.filter(d => d.vencimento.startsWith(mesAtual)).map(d => d.nome);
+
+            // Fixas que faltam no mês atual
+            const paraAdicionar = nomesFixosUnicos.filter(nome => !nomesNoMesAtual.includes(nome));
+
+            if (paraAdicionar.length === 0) return;
+
+            for (let nome of paraAdicionar) {
+                // Pegar a última instância dessa fixa para copiar valor e dia
+                const ultimaFixa = fixasExistentes.filter(d => d.nome === nome).sort((a, b) => b.vencimento.localeCompare(a.vencimento))[0];
+                if (!ultimaFixa) continue;
+                const dia = ultimaFixa.vencimento.split('-')[2];
+                await supabaseClient.from('despesas').insert([{
+                    nome: nome,
+                    valor: ultimaFixa.valor,
+                    fixa: true,
+                    paga: false,
+                    vencimento: `${mesAtual}-${dia}`,
+                    user_id: userId
+                }]);
+            }
+            avisar("Despesas fixas adicionadas automaticamente!", "sucesso");
         }
 
-        // ==========================================
-        // O resto do seu código original continua aqui
-        // ==========================================
-        // Coloque abaixo todas as funções que estavam funcionando antes:
-        // buscarDados, adicionarFixasAutomaticamente, importarDoMesAnterior, 
-        // renderizar, salvarLancamento, alternarStatus, remover, editarItem, etc.
+        async function importarDoMesAnterior() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            const mesAtual = document.getElementById('filtroMes').value;
+            const [ano, mes] = mesAtual.split('-').map(Number);
+            const mesAnterior = new Date(ano, mes - 2, 1).toISOString().substring(0, 7); // Mês anterior
 
-        // Exemplo mínimo para testar o login (substitua pelo seu código completo):
-        function buscarDados() {
-            console.log("Buscando dados para userId:", userId);
-            // Sua lógica real aqui...
+            const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            if (error) return avisar("Erro ao importar", "erro");
+
+            // Não fixas do mês anterior
+            const naoFixasAnterior = data.filter(d => !d.fixa && d.vencimento.startsWith(mesAnterior));
+
+            // Nomes já no mês atual
+            const nomesNoMesAtual = data.filter(d => d.vencimento.startsWith(mesAtual)).map(d => d.nome);
+
+            // Filtrar as que não existem no atual
+            const paraImportar = naoFixasAnterior.filter(f => !nomesNoMesAtual.includes(f.nome));
+
+            // Remove duplicatas (por nome)
+            const unicas = [...new Map(paraImportar.map(item => [item.nome, item])).values()];
+
+            if (unicas.length === 0) return avisar("Nenhuma despesa não fixa do mês anterior para importar.", "info");
+
+            for (let item of unicas) {
+                const dia = item.vencimento.split('-')[2];
+                await supabaseClient.from('despesas').insert([{
+                    nome: item.nome,
+                    valor: item.valor,
+                    fixa: false, // Não fixa
+                    paga: false,
+                    vencimento: `${mesAtual}-${dia}`,
+                    user_id: userId
+                }]);
+            }
+            avisar("Despesas do mês anterior importadas!", "sucesso");
+            buscarDados();
+        }
+
+        function renderizar() {
+            const container = document.getElementById('listaContainer');
+            container.innerHTML = '';
+            let tG = 0, tP = 0;
+            const hoje = new Date().toISOString().split('T')[0];
+            despesasDoMes.sort((a,b) => a.vencimento.localeCompare(b.vencimento)).forEach((item, idx) => {
+                tG += item.valor; if(item.paga) tP += item.valor;
+                const isAtrasada = !item.paga && item.vencimento < hoje;
+                const div = document.createElement('div');
+                div.className = `p-4 rounded-2xl bg-white border flex justify-between items-center ${item.paga ? 'opacity-50 grayscale' : 'shadow-sm'} ${isAtrasada ? 'border-rose-600' : ''}`;
+                div.innerHTML = `
+                    <div onclick="editarItem(${idx})" class="cursor-pointer flex items-center gap-3">
+                        <span class="text-xl">${obterIcone(item.nome)}</span>
+                        <div>
+                            <p class="font-bold text-slate-800">${item.nome} ${item.fixa ? '<span class="fixo-tag">Fixo</span>' : ''}</p>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Dia ${item.vencimento.split('-')[2]} • R$ ${item.valor.toFixed(2)}</p>
+                        </div>
+                    </div>
+                    <div class="flex gap-2">
+                        <button onclick="alternarStatus('${item.id}', true)" class="px-4 py-2 rounded-xl text-[10px] font-black bg-emerald-500 text-white uppercase">Pago</button>
+                        <button onclick="alternarStatus('${item.id}', false)" class="px-4 py-2 rounded-xl text-[10px] font-black bg-rose-500 text-white uppercase">Aberto</button>
+                        <button onclick="remover('${item.id}')" class="text-slate-300 px-2">✕</button>
+                    </div>`;
+                container.appendChild(div);
+            });
+            document.getElementById('totalGeral').innerText = `R$ ${tG.toFixed(2)}`;
+            document.getElementById('totalPago').innerText = `R$ ${tP.toFixed(2)}`;
+        }
+
+        async function salvarLancamento() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            const id = document.getElementById('editId').value;
+            const dia = parseInt(document.getElementById('vencimentoDia').value);
+            const valorStr = document.getElementById('valor').value;
+            const valor = extrairValorFormatado(valorStr);
+            const payload = {
+                nome: document.getElementById('nome').value,
+                valor: valor,
+                vencimento: `${document.getElementById('filtroMes').value}-${dia.toString().padStart(2, '0')}`,
+                fixa: document.getElementById('checkFixa').checked,
+                user_id: userId
+            };
+            if (!payload.nome) return avisar("Descrição obrigatória", "erro");
+            if (dia < 1 || dia > 31) return avisar("Dia inválido (1–31)", "erro");
+            if (payload.valor <= 0) return avisar("Valor deve ser maior que zero", "erro");
+            const { error } = id ? await supabaseClient.from('despesas').update(payload).eq('id', id).eq('user_id', userId) : await supabaseClient.from('despesas').insert([payload]);
+            if (error) avisar(error.message, "erro"); else { cancelarEdicao(); buscarDados(); avisar("Salvo!", "sucesso"); }
+        }
+
+        async function alternarStatus(id, status) { 
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            await supabaseClient.from('despesas').update({ paga: status }).eq('id', id).eq('user_id', userId); 
+            buscarDados(); 
+        }
+
+        async function remover(id) { 
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            if(confirm("Remover?")) { 
+                await supabaseClient.from('despesas').delete().eq('id', id).eq('user_id', userId); 
+                buscarDados(); 
+            } 
+        }
+        
+        function editarItem(idx) {
+            const item = despesasDoMes[idx];
+            document.getElementById('editId').value = item.id;
+            document.getElementById('nome').value = item.nome;
+            document.getElementById('valor').value = `R$ ${item.valor.toFixed(2).replace('.', ',')}`;
+            document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
+            document.getElementById('checkFixa').checked = item.fixa;
+            document.getElementById('btnCancelar').classList.remove('hidden');
+        }
+
+        function cancelarEdicao() {
+            document.getElementById('editId').value = '';
+            document.getElementById('nome').value = '';
+            document.getElementById('valor').value = '';
+            document.getElementById('vencimentoDia').value = '';
+            document.getElementById('checkFixa').checked = false;
+            document.getElementById('btnCancelar').classList.add('hidden');
         }
     </script>
 </body>
