@@ -1,228 +1,115 @@
 <!DOCTYPE html>
-<html lang="pt-br" class="light">
+<html lang="pt-br">
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financeiro Pro - Versão Completa Corrigida</title>
+    <title>Financeiro Pro - Versão Final Corrigida</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         .dark { background-color: #0f172a; color: #f8fafc; }
         .dark .bg-white { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
-        .dark .text-slate-800 { color: #f1f5f9; }
-        .dark .text-slate-400 { color: #94a3b8; }
-        .dark .bg-slate-50 { background-color: #334155; }
-        .dark .border-slate-200 { border-color: #475569; }
         #telaAuth { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
         .fixo-tag { background-color: #eff6ff; color: #1d4ed8; font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 800; border: 1px solid #dbeafe; text-transform: uppercase; }
-        .dark .fixo-tag { background-color: #1e40af; color: #bfdbfe; border-color: #3b82f6; }
         .hidden { display: none !important; }
         @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .toast-anim { animation: slideUp 0.3s ease-out; }
-        .item-transition { transition: all 0.3s ease; }
-        .item-paid { opacity: 0.5; transform: scale(0.98); filter: grayscale(80%); }
-        .atrasada { background-color: #fee2e2; border-color: #dc2626; border-width: 2px; }
-        .dark .atrasada { background-color: #7f1d1d; border-color: #f87171; border-width: 2px; }
-        .icon-lg { font-size: 2.2rem; }
     </style>
 </head>
-<body class="bg-slate-100 dark:bg-slate-900 min-h-screen p-4 font-sans transition-colors duration-300" id="corpo">
+<body class="bg-slate-100 min-h-screen p-4 font-sans" id="corpo">
 
-    <!-- Tela de autenticação -->
     <div id="telaAuth" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
-        <div class="bg-white dark:bg-slate-800 p-8 rounded-3xl shadow-2xl w-full max-w-sm transition-colors">
-            <h2 id="authTitulo" class="text-3xl font-black mb-8 text-center text-slate-800 dark:text-slate-100">Financeiro Pro</h2>
-            
-            <form id="formAuth" onsubmit="return false;" autocomplete="off" class="space-y-5">
-                <input type="email" id="email" placeholder="Seu e-mail" required
-                       class="w-full px-5 py-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-                
-                <input type="password" id="senha" placeholder="Senha" required
-                       class="w-full px-5 py-4 rounded-xl border border-slate-300 dark:border-slate-600 bg-slate-50 dark:bg-slate-700 text-slate-900 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-blue-500">
-
-                <button type="button" onclick="gerenciarAuth()" 
-                        class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-xl transition shadow-lg">
-                    <span id="btnText">Entrar</span>
-                </button>
-
-                <button type="button" onclick="alternarModo()" 
-                        class="w-full text-slate-500 dark:text-slate-400 text-sm font-medium hover:text-blue-600 transition">
-                    <span id="toggleText">Ainda não tem conta? Criar conta</span>
-                </button>
+        <div class="bg-white p-8 rounded-3xl shadow-2xl w-full max-w-sm">
+            <h2 id="authTitulo" class="text-2xl font-black mb-6 text-center text-slate-800">Financeiro Pro</h2>
+            <form id="camposAuth" onsubmit="return false;" autocomplete="off" class="space-y-4">
+                <input style="display:none" type="text" name="fake_user"/><input style="display:none" type="password" name="fake_password"/>
+                <input type="email" id="u_mail" placeholder="E-mail" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" autocomplete="new-password">
+                <input type="text" id="u_pass" placeholder="Senha" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" autocomplete="new-password" onfocus="this.type='password'">
+                <button onclick="gerenciarAuth()" id="btnPrincipal" class="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase shadow-lg">Entrar</button>
+                <button type="button" onclick="alternarAuth()" id="btnTroca" class="w-full text-xs font-bold text-slate-400 uppercase mt-2">Criar conta / Login</button>
             </form>
-
-            <div id="erroMsg" class="mt-4 text-red-600 dark:text-red-400 text-center font-medium hidden"></div>
-            <div id="sucessoMsg" class="mt-4 text-green-600 dark:text-green-400 text-center font-medium hidden"></div>
+            <div id="campoNovaSenha" class="hidden space-y-4 text-center">
+                <input type="password" id="novaSenhaInput" placeholder="Nova senha" class="w-full border rounded-xl px-4 py-3">
+                <button onclick="atualizarSenha()" class="w-full bg-emerald-600 text-white py-4 rounded-xl font-black uppercase">Salvar</button>
+            </div>
         </div>
     </div>
 
-    <!-- Área principal do app -->
-    <div id="app" class="max-w-4xl mx-auto space-y-8 hidden">
-        <!-- Cabeçalho -->
-        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-6 border-b-4 border-blue-600 flex justify-between items-center transition-colors">
-            <h1 class="text-3xl font-black text-slate-800 dark:text-slate-100">Minhas Contas</h1>
-            <div class="flex items-center gap-4">
-                <button onclick="toggleDarkMode()" class="text-3xl p-2 rounded-full hover:bg-slate-100 dark:hover:bg-slate-700 transition" title="Alternar tema">
-                    🌙
-                </button>
-                <button onclick="logout()" class="text-rose-500 hover:text-rose-700 font-bold text-sm uppercase border border-rose-200 dark:border-rose-700 px-4 py-2 rounded-lg transition">
-                    Sair
-                </button>
-            </div>
+    <div id="app" class="max-w-2xl mx-auto space-y-6 hidden">
+        <div class="bg-white rounded-2xl shadow-sm p-6 border-b-4 border-blue-600 flex justify-between items-center">
+            <h1 class="text-2xl font-black text-slate-800">Minhas Contas</h1>
+            <button onclick="logout()" class="text-rose-500 font-bold text-xs uppercase border border-rose-100 px-3 py-2 rounded-lg">Sair</button>
         </div>
 
-        <!-- Filtro de mês e importar -->
-        <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-slate-700 space-y-4 transition-colors">
+        <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
             <div class="flex flex-col md:flex-row gap-4 items-end">
                 <div class="flex-1 w-full">
-                    <p class="text-sm font-bold text-slate-400 dark:text-slate-400 uppercase mb-2">Mês de Referência</p>
-                    <input type="month" id="filtroMes" onchange="buscarDados()" class="bg-slate-50 dark:bg-slate-700 border rounded-xl font-black text-blue-600 text-2xl p-3 w-full outline-none transition-colors">
+                    <p class="text-[10px] font-bold text-slate-400 uppercase mb-1">Mês de Referência</p>
+                    <input type="month" id="filtroMes" onchange="buscarDados()" class="bg-slate-50 border rounded-xl font-black text-blue-600 text-xl p-3 w-full outline-none">
                 </div>
-                <button onclick="importarDoMesAnterior()" class="w-full md:w-auto bg-slate-900 hover:bg-slate-800 text-white px-8 py-4 rounded-xl text-sm font-black uppercase transition">
-                    📥 Importar do Mês Anterior
-                </button>
+                <button onclick="importarFixas()" class="w-full md:w-auto bg-slate-900 text-white px-6 py-4 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition">📥 Importar Fixas</button>
             </div>
         </div>
 
-        <!-- Cards de totais -->
         <div class="grid grid-cols-2 gap-4">
-            <div class="bg-white dark:bg-slate-800 p-6 rounded-2xl border border-slate-200 dark:border-slate-700 text-center transition-colors">
-                <p class="text-sm text-slate-400 dark:text-slate-400 font-bold uppercase">Total Geral</p>
-                <p id="totalGeral" class="text-3xl font-black text-slate-900 dark:text-slate-100">R$ 0,00</p>
+            <div class="bg-white p-5 rounded-2xl border text-center">
+                <p class="text-[10px] text-slate-400 font-bold uppercase">Total Geral</p>
+                <p id="totalGeral" class="text-xl font-black">R$ 0,00</p>
             </div>
-            <div class="bg-emerald-500 p-6 rounded-2xl text-white text-center">
-                <p class="text-sm font-bold uppercase opacity-80">Total Pago</p>
-                <p id="totalPago" class="text-3xl font-black">R$ 0,00</p>
+            <div class="bg-emerald-500 p-5 rounded-2xl text-white text-center">
+                <p class="text-[10px] font-bold uppercase opacity-80">Total Pago</p>
+                <p id="totalPago" class="text-xl font-black">R$ 0,00</p>
             </div>
         </div>
 
-        <!-- Formulário de novo lançamento -->
-        <div class="bg-white dark:bg-slate-800 rounded-2xl shadow-sm p-6 border border-slate-200 dark:border-slate-700 transition-colors">
-            <div class="flex justify-between items-center mb-6">
-                <h2 class="font-bold uppercase text-sm text-slate-400 dark:text-slate-400">Novo Lançamento</h2>
-                <label class="text-sm font-bold text-slate-400 dark:text-slate-400 uppercase flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" id="checkFixa" class="w-5 h-5 accent-blue-600">
-                    Despesa Fixa
+        <div id="boxForm" class="bg-white rounded-2xl shadow-sm p-6 border border-slate-200">
+            <div class="flex justify-between items-center mb-4">
+                <h2 id="formTitulo" class="font-bold uppercase text-xs text-slate-400">Novo Lançamento</h2>
+                <label class="text-[10px] font-bold text-slate-400 uppercase flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" id="checkFixa" class="w-4 h-4"> Despesa Fixa
                 </label>
             </div>
             <input type="hidden" id="editId">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
-                <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-5 py-4 text-base outline-none bg-slate-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors">
-                <input type="text" id="valor" placeholder="Valor (ex: 123,45)" class="border rounded-xl px-5 py-4 text-base outline-none bg-slate-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors" oninput="formatarValor(this)">
-                <input type="number" id="vencimentoDia" placeholder="Dia (1-31)" min="1" max="31" class="border rounded-xl px-5 py-4 text-base outline-none bg-slate-50 dark:bg-slate-700 dark:border-slate-600 dark:text-white transition-colors">
-                <button onclick="salvarLancamento()" class="bg-blue-600 hover:bg-blue-700 text-white px-5 py-4 rounded-xl font-bold uppercase transition">Salvar</button>
+            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+                <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
+                <input type="text" id="valor" placeholder="Valor (ex: 123.45)" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50" oninput="formatarValor(this)">
+                <input type="number" id="vencimentoDia" placeholder="Dia" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
+                <button onclick="salvarLancamento()" id="btnSalvar" class="bg-blue-600 text-white px-4 py-3 rounded-xl font-black uppercase text-xs">Salvar</button>
             </div>
-            <button onclick="cancelarEdicao()" id="btnCancelar" class="hidden w-full mt-4 text-rose-500 dark:text-rose-400 text-sm font-bold uppercase">Cancelar Edição</button>
+            <button onclick="cancelarEdicao()" id="btnCancelar" class="hidden w-full mt-2 text-rose-500 text-[10px] font-bold uppercase">Cancelar Edição</button>
         </div>
 
-        <!-- Lista de despesas -->
-        <div id="listaContainer" class="space-y-4 pb-20"></div>
+        <div id="listaContainer" class="space-y-3 pb-20"></div>
     </div>
 
     <script>
-        const supabase = supabase.createClient(
-            'https://hzfjdtpllocdbeqsxhly.supabase.co',
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6ZmpkdHBsbG9jZGJlcXN4aGx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyOTkxOTYsImV4cCI6MjA4NTg3NTE5Nn0.-4mugGyPB6ozbtTSgjRd_buHea3m9rf-yRnxz7BY6CA'
-        );
+        const _URL = "https://hzfjdtpllocdbeqsxhly.supabase.co"; 
+        const _KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imh6ZmpkdHBsbG9jZGJlcXN4aGx5Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzAyOTkxOTYsImV4cCI6MjA4NTg3NTE5Nn0.-4mugGyPB6ozbtTSgjRd_buHea3m9rf-yRnxz7BY6CA";
+        const supabaseClient = supabase.createClient(_URL, _KEY);
 
         let isLoginMode = true;
         let despesasDoMes = [];
         let userId = null;
+        document.getElementById('filtroMes').value = new Date().toISOString().substring(0, 7);
 
-        document.getElementById('filtroMes').value = new Date().toISOString().slice(0, 7);
-
-        // Função para mostrar mensagens de erro/sucesso
-        function mostrarMensagem(msg, tipo = 'erro') {
-            const el = document.getElementById(tipo === 'erro' ? 'erroMsg' : 'sucessoMsg');
-            el.textContent = msg;
-            el.classList.remove('hidden');
-            el.classList.toggle('text-red-600', tipo === 'erro');
-            el.classList.toggle('text-green-600', tipo === 'sucesso');
-            setTimeout(() => el.classList.add('hidden'), 5000);
+        function avisar(msg, tipo = 'info') {
+            const cores = { erro: 'bg-rose-600', sucesso: 'bg-emerald-600', info: 'bg-blue-600' };
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 ${cores[tipo]} text-white px-6 py-4 rounded-2xl shadow-2xl z-[200] font-bold text-sm toast-anim`;
+            toast.innerText = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => { toast.remove(); }, 3000);
         }
 
-        // Atualiza interface do formulário de auth
-        function atualizarInterfaceAuth() {
-            document.getElementById('btnText').textContent = isLoginMode ? 'Entrar' : 'Criar Conta';
-            document.getElementById('toggleText').textContent = isLoginMode 
-                ? 'Ainda não tem conta? Criar conta' 
-                : 'Já tem conta? Fazer login';
+        function obterIcone(nome) {
+            const n = nome.toLowerCase();
+            if(n.includes("luz") || n.includes("ener")) return "⚡";
+            if(n.includes("agua")) return "💧";
+            if(n.includes("net") || n.includes("wifi")) return "🌐";
+            if(n.includes("aluguel")) return "🏠";
+            if(n.includes("mercado") || n.includes("compr")) return "🛒";
+            return "💰";
         }
-
-        function alternarModo() {
-            isLoginMode = !isLoginMode;
-            atualizarInterfaceAuth();
-        }
-
-        async function gerenciarAuth() {
-            const email = document.getElementById('email').value.trim();
-            const senha = document.getElementById('senha').value;
-
-            if (!email || !senha) {
-                mostrarMensagem('Preencha e-mail e senha', 'erro');
-                return;
-            }
-
-            console.log(`Tentando ${isLoginMode ? 'login' : 'cadastro'} com:`, email);
-
-            let resultado;
-            if (isLoginMode) {
-                resultado = await supabase.auth.signInWithPassword({ email, password: senha });
-            } else {
-                resultado = await supabase.auth.signUp({ email, password: senha });
-            }
-
-            const { data, error } = resultado;
-
-            if (error) {
-                console.error('Erro Supabase:', error);
-                mostrarMensagem(error.message || 'Erro ao conectar', 'erro');
-                return;
-            }
-
-            console.log('Sucesso:', data);
-
-            // Se for cadastro novo e precisar de confirmação de e-mail
-            if (!isLoginMode && !data.session) {
-                mostrarMensagem('Conta criada! Verifique seu e-mail para confirmar (confira spam)', 'sucesso');
-                return;
-            }
-
-            // Login bem-sucedido
-            userId = data.user.id;
-            document.getElementById('telaAuth').classList.add('hidden');
-            document.getElementById('app').classList.remove('hidden');
-            await buscarDados();
-            mostrarMensagem('Login realizado com sucesso!', 'sucesso');
-        }
-
-        // Verifica se já está logado ao carregar
-        supabase.auth.getSession().then(({ data: { session } }) => {
-            if (session) {
-                userId = session.user.id;
-                document.getElementById('telaAuth').classList.add('hidden');
-                document.getElementById('app').classList.remove('hidden');
-                buscarDados();
-            }
-        });
-
-        // Alterna modo escuro
-        function toggleDarkMode() {
-            document.documentElement.classList.toggle('dark');
-            localStorage.setItem('theme', document.documentElement.classList.contains('dark') ? 'dark' : 'light');
-        }
-
-        if (localStorage.getItem('theme') === 'dark' || 
-            (!localStorage.getItem('theme') && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
-            document.documentElement.classList.add('dark');
-        }
-
-        async function logout() {
-            await supabase.auth.signOut();
-            location.reload();
-        }
-
-        // ------------------ RESTANTE DO APP (despesas, lista, etc.) ------------------
 
         function formatarValor(input) {
             let valor = input.value.replace(/\D/g, '');
@@ -236,94 +123,153 @@
             return parseFloat(valorStr.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) || 0;
         }
 
-        async function buscarDados() {
-            if (!userId) return mostrarMensagem('Faça login para continuar', 'erro');
-
-            const mesRef = document.getElementById('filtroMes').value;
-
-            const { data, error } = await supabase
-                .from('despesas')
-                .select('*')
-                .eq('user_id', userId)
-                .eq('excluida', false);
-
-            if (error) {
-                console.error('Erro ao buscar despesas:', error);
-                mostrarMensagem('Erro ao carregar despesas', 'erro');
-                return;
+        // --- AUTH ---
+        supabaseClient.auth.onAuthStateChange(async (event, session) => {
+            if (session) {
+                userId = session.user.id;
+                entrarNoApp();
+            } else {
+                userId = null;
             }
+        });
 
-            despesasDoMes = data.filter(d => d.vencimento?.startsWith(mesRef));
-            await adicionarFixasAutomaticamente(mesRef, data);
+        async function gerenciarAuth() {
+            const email = document.getElementById('u_mail').value;
+            const password = document.getElementById('u_pass').value;
+            const { error } = isLoginMode 
+                ? await supabaseClient.auth.signInWithPassword({ email, password })
+                : await supabaseClient.auth.signUp({ email, password });
+            if (error) avisar(error.message, "erro");
+        }
+
+        function entrarNoApp() {
+            document.getElementById('telaAuth').classList.add('hidden');
+            document.getElementById('app').classList.remove('hidden');
+            buscarDados();
+        }
+
+        async function logout() { await supabaseClient.auth.signOut(); localStorage.clear(); location.reload(); }
+        function alternarAuth() { isLoginMode = !isLoginMode; document.getElementById('authTitulo').innerText = isLoginMode ? 'Financeiro Pro' : 'Nova Conta'; }
+
+        // --- DADOS ---
+        async function buscarDados() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            const mesRef = document.getElementById('filtroMes').value;
+            const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            if (error) return avisar("Erro ao carregar", "erro");
+            despesasDoMes = data.filter(d => d.vencimento.startsWith(mesRef));
             renderizar();
         }
 
-        async function adicionarFixasAutomaticamente(mesAtual, allData) {
-            const fixas = allData.filter(d => d.fixa && !d.excluida);
-            const nomesUnicos = [...new Set(fixas.map(d => d.nome))];
-            const nomesAtuais = allData.filter(d => d.vencimento?.startsWith(mesAtual)).map(d => d.nome);
-            const paraAdd = nomesUnicos.filter(n => !nomesAtuais.includes(n));
+        async function importarFixas() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            const mesAtual = document.getElementById('filtroMes').value;
+            const { data, error } = await supabaseClient.from('despesas').select('*').eq('user_id', userId);
+            if (error) return avisar("Erro ao importar", "erro");
+            
+            // Filtra o que é FIXO e NÃO está no mês atual
+            const fixasExistentes = data.filter(d => d.fixa === true);
+            const nomesNoMesAtual = data.filter(d => d.vencimento.startsWith(mesAtual)).map(d => d.nome);
+            
+            const paraImportar = fixasExistentes.filter(f => !nomesNoMesAtual.includes(f.nome));
+            
+            // Remove duplicatas de nomes nas fixas para importar apenas uma de cada
+            const únicas = [...new Map(paraImportar.map(item => [item.nome, item])).values()];
 
-            if (paraAdd.length === 0) return;
+            if(únicas.length === 0) return avisar("Nenhuma despesa fixa nova para importar.", "info");
 
-            let count = 0;
-            for (const nome of paraAdd) {
-                const ultima = fixas.filter(d => d.nome === nome).sort((a,b) => b.vencimento.localeCompare(a.vencimento))[0];
-                if (!ultima) continue;
-                const dia = ultima.vencimento.split('-')[2];
-                const { error } = await supabase.from('despesas').insert({
-                    nome, valor: ultima.valor, fixa: true, paga: false, excluida: false,
-                    vencimento: `${mesAtual}-${dia}`, user_id: userId
-                });
-                if (!error) count++;
+            for(let item of únicas) {
+                const dia = item.vencimento.split('-')[2];
+                await supabaseClient.from('despesas').insert([{
+                    nome: item.nome, valor: item.valor, fixa: true, paga: false,
+                    vencimento: `${mesAtual}-${dia}`,
+                    user_id: userId
+                }]);
             }
-            if (count > 0) {
-                mostrarMensagem(`Adicionadas ${count} despesas fixas automaticamente`, 'sucesso');
-                await buscarDados();
-            }
+            avisar("Despesas fixas importadas!", "sucesso");
+            buscarDados();
         }
 
         function renderizar() {
             const container = document.getElementById('listaContainer');
             container.innerHTML = '';
-            let totalGeral = 0, totalPago = 0;
+            let tG = 0, tP = 0;
             const hoje = new Date().toISOString().split('T')[0];
-
             despesasDoMes.sort((a,b) => a.vencimento.localeCompare(b.vencimento)).forEach((item, idx) => {
-                totalGeral += item.valor;
-                if (item.paga) totalPago += item.valor;
-
-                const atrasada = !item.paga && item.vencimento < hoje;
-                const icone = obterIcone(item.nome);
-
+                tG += item.valor; if(item.paga) tP += item.valor;
+                const isAtrasada = !item.paga && item.vencimento < hoje;
                 const div = document.createElement('div');
-                div.className = `p-5 rounded-2xl bg-white dark:bg-slate-800 border flex justify-between items-center transition-all ${item.paga ? 'item-paid' : 'shadow-sm'} ${atrasada ? 'atrasada' : ''}`;
+                div.className = `p-4 rounded-2xl bg-white border flex justify-between items-center ${item.paga ? 'opacity-50 grayscale' : 'shadow-sm'} ${isAtrasada ? 'border-rose-600' : ''}`;
                 div.innerHTML = `
-                    <div class="flex items-center gap-4 cursor-pointer flex-1" onclick="editarItem(${idx})">
-                        <span class="text-4xl">${icone}</span>
+                    <div onclick="editarItem(${idx})" class="cursor-pointer flex items-center gap-3">
+                        <span class="text-xl">${obterIcone(item.nome)}</span>
                         <div>
-                            <p class="font-bold text-lg">${item.nome} ${item.fixa ? '<span class="fixo-tag">FIXO</span>' : ''} ${atrasada ? '<span class="text-red-600 font-bold">⚠️ ATRASADA</span>' : ''}</p>
-                            <p class="text-sm text-gray-500 dark:text-gray-400">Dia ${item.vencimento.split('-')[2]} • R$ ${item.valor.toFixed(2)}</p>
+                            <p class="font-bold text-slate-800">${item.nome} ${item.fixa ? '<span class="fixo-tag">Fixo</span>' : ''}</p>
+                            <p class="text-[10px] font-bold text-slate-400 uppercase">Dia ${item.vencimento.split('-')[2]} • R$ ${item.valor.toFixed(2)}</p>
                         </div>
                     </div>
-                    <div class="flex gap-3">
-                        <button onclick="alternarStatus('${item.id}', true)" class="px-5 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition">Pago</button>
-                        <button onclick="alternarStatus('${item.id}', false)" class="px-5 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition">Aberto</button>
-                        <button onclick="duplicarDespesa(${idx})" class="px-4 py-2 bg-indigo-100 dark:bg-indigo-900 text-indigo-700 dark:text-indigo-300 rounded-lg hover:bg-indigo-200 transition">📋</button>
-                        <button onclick="remover('${item.id}', ${item.fixa})" class="text-red-600 dark:text-red-400 text-2xl hover:text-red-800 transition">✕</button>
+                    <div class="flex gap-2">
+                        <button onclick="alternarStatus('${item.id}', ${!item.paga})" class="px-4 py-2 rounded-xl text-[10px] font-black ${item.paga ? 'bg-emerald-500 text-white' : 'bg-rose-500 text-white'} uppercase">${item.paga ? 'Pago' : 'Aberto'}</button>
+                        <button onclick="remover('${item.id}')" class="text-slate-300 px-2">✕</button>
                     </div>`;
                 container.appendChild(div);
             });
-
-            document.getElementById('totalGeral').textContent = `R$ ${totalGeral.toFixed(2)}`;
-            document.getElementById('totalPago').textContent = `R$ ${totalPago.toFixed(2)}`;
+            document.getElementById('totalGeral').innerText = `R$ ${tG.toFixed(2)}`;
+            document.getElementById('totalPago').innerText = `R$ ${tP.toFixed(2)}`;
         }
 
-        // Funções restantes (salvarLancamento, alternarStatus, remover, editarItem, cancelarEdicao, etc.)
-        // ... (adicione aqui as funções que estavam no seu código anterior, como salvarLancamento, alternarStatus, remover com excluida: true, etc.)
+        async function salvarLancamento() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            const id = document.getElementById('editId').value;
+            const dia = parseInt(document.getElementById('vencimentoDia').value);
+            const valorStr = document.getElementById('valor').value;
+            const valor = extrairValorFormatado(valorStr);
+            const payload = {
+                nome: document.getElementById('nome').value,
+                valor: valor,
+                vencimento: `${document.getElementById('filtroMes').value}-${dia.toString().padStart(2, '0')}`,
+                fixa: document.getElementById('checkFixa').checked,
+                user_id: userId
+            };
+            if (!payload.nome) return avisar("Descrição obrigatória", "erro");
+            if (dia < 1 || dia > 31) return avisar("Dia inválido (1–31)", "erro");
+            if (payload.valor <= 0) return avisar("Valor deve ser maior que zero", "erro");
+            const { error } = id ? await supabaseClient.from('despesas').update(payload).eq('id', id).eq('user_id', userId) : await supabaseClient.from('despesas').insert([payload]);
+            if (error) avisar(error.message, "erro"); else { cancelarEdicao(); buscarDados(); avisar("Salvo!", "sucesso"); }
+        }
 
-        // Inicializa
-        atualizarInterfaceAuth();
+        async function alternarStatus(id, status) { 
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            await supabaseClient.from('despesas').update({ paga: status }).eq('id', id).eq('user_id', userId); 
+            buscarDados(); 
+        }
+
+        async function remover(id) { 
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            if(confirm("Remover?")) { 
+                await supabaseClient.from('despesas').delete().eq('id', id).eq('user_id', userId); 
+                buscarDados(); 
+            } 
+        }
+        
+        function editarItem(idx) {
+            const item = despesasDoMes[idx];
+            document.getElementById('editId').value = item.id;
+            document.getElementById('nome').value = item.nome;
+            document.getElementById('valor').value = `R$ ${item.valor.toFixed(2).replace('.', ',')}`;
+            document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
+            document.getElementById('checkFixa').checked = item.fixa;
+            document.getElementById('btnCancelar').classList.remove('hidden');
+        }
+
+        function cancelarEdicao() {
+            document.getElementById('editId').value = '';
+            document.getElementById('nome').value = '';
+            document.getElementById('valor').value = '';
+            document.getElementById('vencimentoDia').value = '';
+            document.getElementById('checkFixa').checked = false;
+            document.getElementById('btnCancelar').classList.add('hidden');
+        }
     </script>
 </body>
 </html>
