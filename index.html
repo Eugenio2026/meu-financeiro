@@ -6,10 +6,6 @@
     <title>Financeiro Pro</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-    <script src="https://cdn.jsdelivr.net/npm/papaparse@5.4.1/papaparse.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0"></script>
-    <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.4.0/css/all.min.css">
     <style>
         .dark { background-color: #0f172a; color: #f8fafc; }
         .dark .bg-white { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
@@ -19,28 +15,21 @@
         .dark .text-slate-400 { color: #94a3b8; }
         .dark .border-slate-200 { border-color: #334155; }
         #telaAuth { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
-        .fixo-tag { background-color: #eff6ff; color: #1d4ed8; font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 800; border: 1px solid #dbeafe; text-transform: uppercase; }
-        .dark .fixo-tag { background-color: #1e40af; color: #bfdbfe; border-color: #1e40af; }
         .hidden { display: none !important; }
         @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .toast-anim { animation: slideUp 0.3s ease-out; }
         .password-container { position: relative; }
         .password-container input { padding-right: 2.5rem; }
         .password-toggle { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); cursor: pointer; }
-        .modal { position: fixed; inset: 0; background: rgba(0,0,0,0.5); display: flex; align-items: center; justify-content: center; z-index: 150; }
-        .modal-content { background: white; padding: 2rem; border-radius: 1rem; max-width: 80%; max-height: 80%; overflow: auto; }
-        .dark .modal-content { background: #1e293b; color: #f1f5f9; }
-        .progress-bar { height: 8px; border-radius: 999px; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4 font-sans" id="corpo">
 
-    <!-- Tela de autenticação -->
     <div id="telaAuth" class="fixed inset-0 z-[100] flex items-center justify-center p-4">
         <div class="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-2xl w-full max-w-sm">
             <h2 id="authTitulo" class="text-2xl font-black mb-6 text-center text-slate-800 dark:text-slate-100">Financeiro Pro</h2>
             <form id="camposAuth" onsubmit="return false;" autocomplete="off" class="space-y-4">
-                <!-- Campos ocultos para evitar autofill do navegador -->
+                <!-- Anti-autofill -->
                 <input type="text" name="fakeuser" style="display:none;" autocomplete="off">
                 <input type="password" name="fakepass" style="display:none;" autocomplete="off">
 
@@ -48,7 +37,7 @@
                     type="email" 
                     id="u_mail" 
                     placeholder="E-mail" 
-                    class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-gray-700 dark:text-white" 
+                    class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-gray-700 dark:text-white"
                     autocomplete="off" 
                     autocorrect="off" 
                     autocapitalize="off" 
@@ -59,7 +48,7 @@
                         type="password" 
                         id="u_pass" 
                         placeholder="Senha" 
-                        class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-gray-700 dark:text-white" 
+                        class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-gray-700 dark:text-white"
                         autocomplete="new-password"
                     >
                     <span class="password-toggle text-slate-400 dark:text-slate-300" onclick="togglePassword()">👁️</span>
@@ -70,7 +59,6 @@
         </div>
     </div>
 
-    <!-- Conteúdo principal -->
     <div id="app" class="max-w-2xl mx-auto space-y-6 hidden">
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border-b-4 border-blue-600 flex justify-between items-center">
             <h1 class="text-2xl font-black text-slate-800 dark:text-slate-100">Minhas Contas</h1>
@@ -80,103 +68,9 @@
             </div>
         </div>
 
-        <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 space-y-4">
-            <div class="flex flex-col md:flex-row gap-4 items-end">
-                <div class="flex-1 w-full">
-                    <p class="text-[10px] font-bold text-slate-400 dark:text-slate-400 uppercase mb-1">Mês de Referência</p>
-                    <input type="month" id="filtroMes" onchange="buscarDados()" class="bg-slate-50 dark:bg-gray-700 border rounded-xl font-black text-blue-600 dark:text-blue-400 text-xl p-3 w-full outline-none">
-                </div>
-                <button onclick="prepararImportarDoMesAnterior()" class="w-full md:w-auto bg-slate-900 dark:bg-slate-700 text-white px-6 py-4 rounded-xl text-[10px] font-black uppercase hover:bg-blue-600 transition">📥 Importar do Mês Anterior</button>
-            </div>
-        </div>
-
-        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
-            <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl border dark:border-gray-700 text-center">
-                <p class="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase">Total Geral</p>
-                <p id="totalGeral" class="text-xl font-black text-slate-800 dark:text-slate-100">R$ 0,00</p>
-            </div>
-            <div class="bg-emerald-500 p-5 rounded-2xl text-white text-center">
-                <p class="text-[10px] font-bold uppercase opacity-80">Total Pago</p>
-                <p id="totalPago" class="text-xl font-black">R$ 0,00</p>
-            </div>
-            <div class="bg-rose-500 p-5 rounded-2xl text-white text-center">
-                <p class="text-[10px] font-bold uppercase opacity-80">Restante</p>
-                <p id="totalRestante" class="text-xl font-black">R$ 0,00</p>
-            </div>
-            <div class="bg-blue-500 p-5 rounded-2xl text-white text-center">
-                <p class="text-[10px] font-bold uppercase opacity-80">Progresso</p>
-                <div class="mt-2 bg-white dark:bg-gray-700 rounded-full p-1">
-                    <div id="progressBar" class="progress-bar bg-emerald-500 w-0 transition-all duration-500"></div>
-                </div>
-            </div>
-        </div>
-
-        <div id="boxForm" class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200 dark:border-gray-700">
-            <div class="flex justify-between items-center mb-4">
-                <h2 class="font-bold uppercase text-xs text-slate-400 dark:text-slate-400">Novo Lançamento</h2>
-                <label class="text-[10px] font-bold text-slate-400 dark:text-slate-300 uppercase flex items-center gap-2 cursor-pointer">
-                    <input type="checkbox" id="checkFixa" class="w-4 h-4" onchange="toggleFixaOptions()"> Despesa Fixa
-                </label>
-            </div>
-            <input type="hidden" id="editId">
-            <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
-                <select id="categoria" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 dark:bg-gray-700 dark:text-white">
-                    <option value="">Categoria</option>
-                    <option value="Energia"><i class="fas fa-bolt"></i> Energia</option>
-                    <option value="Água"><i class="fas fa-tint"></i> Água</option>
-                    <option value="Internet"><i class="fas fa-wifi"></i> Internet</option>
-                    <option value="Aluguel"><i class="fas fa-home"></i> Aluguel</option>
-                    <option value="Mercado"><i class="fas fa-shopping-cart"></i> Mercado</option>
-                    <option value="Outros"><i class="fas fa-money-bill"></i> Outros</option>
-                </select>
-                <input type="text" id="nome" placeholder="Nome / Descrição" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 dark:bg-gray-700 dark:text-white">
-                <input type="text" id="valor" placeholder="Valor (ex: 123.45)" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 dark:bg-gray-700 dark:text-white" oninput="formatarValor(this)">
-                <input type="number" id="vencimentoDia" placeholder="Dia" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 dark:bg-gray-700 dark:text-white">
-                <button onclick="salvarLancamento()" class="bg-blue-600 text-white px-4 py-3 rounded-xl font-black uppercase text-xs hover:bg-blue-700 transition">Salvar</button>
-            </div>
-            <div id="parcelasOptions" class="grid grid-cols-1 md:grid-cols-2 gap-3 mt-3 hidden">
-                <input type="number" id="numParcelas" placeholder="Nº de Parcelas" min="1" value="1" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 dark:bg-gray-700 dark:text-white">
-                <input type="number" id="intervaloMeses" placeholder="Intervalo (meses)" min="1" value="1" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 dark:bg-gray-700 dark:text-white">
-            </div>
-            <button onclick="cancelarEdicao()" id="btnCancelar" class="hidden w-full mt-2 text-rose-500 dark:text-rose-400 text-[10px] font-bold uppercase">Cancelar Edição</button>
-        </div>
-
         <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700">
-            <div class="flex flex-col md:flex-row gap-4">
-                <input type="text" id="buscaDespesa" placeholder="Buscar por nome..." class="flex-1 border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 dark:bg-gray-700 dark:text-white" oninput="filtrarLista()">
-                <select id="filtroStatus" onchange="filtrarLista()" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 dark:bg-gray-700 dark:text-white">
-                    <option value="todos">Todos</option>
-                    <option value="pagas">Pagas</option>
-                    <option value="abertas">Abertas</option>
-                    <option value="atrasadas">Atrasadas</option>
-                </select>
-                <button onclick="exportarCSV()" class="bg-indigo-600 text-white px-6 py-3 rounded-xl text-xs font-black uppercase hover:bg-indigo-700">CSV</button>
-                <button onclick="exportarPDF()" class="bg-purple-600 text-white px-6 py-3 rounded-xl text-xs font-black uppercase hover:bg-purple-700">PDF</button>
-                <button onclick="mostrarRelatorio()" class="bg-teal-600 text-white px-6 py-3 rounded-xl text-xs font-black uppercase hover:bg-teal-700">Relatório</button>
-            </div>
-        </div>
-
-        <div id="listaContainer" class="space-y-3 pb-20"></div>
-    </div>
-
-    <!-- Modal Importação -->
-    <div id="modalImport" class="modal hidden">
-        <div class="modal-content dark:bg-gray-800">
-            <h2 class="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">Itens a importar</h2>
-            <ul id="listaImport" class="space-y-2 mb-4"></ul>
-            <div class="flex gap-4">
-                <button onclick="confirmarImportar()" class="bg-emerald-600 text-white px-4 py-2 rounded-xl hover:bg-emerald-700">Confirmar</button>
-                <button onclick="fecharModal('modalImport')" class="bg-rose-600 text-white px-4 py-2 rounded-xl hover:bg-rose-700">Cancelar</button>
-            </div>
-        </div>
-    </div>
-
-    <!-- Modal Relatório -->
-    <div id="modalRelatorio" class="modal hidden">
-        <div class="modal-content dark:bg-gray-800 w-full max-w-lg">
-            <h2 class="text-xl font-bold mb-4 text-slate-800 dark:text-slate-100">Relatório Mensal</h2>
-            <canvas id="chartCategorias" height="200"></canvas>
-            <button onclick="fecharModal('modalRelatorio')" class="mt-4 bg-rose-600 text-white px-4 py-2 rounded-xl hover:bg-rose-700">Fechar</button>
+            <p class="text-center text-slate-600 dark:text-slate-300">Bem-vindo! (Conteúdo da app aqui)</p>
+            <!-- Coloque aqui todo o resto da sua aplicação quando quiser -->
         </div>
     </div>
 
@@ -187,22 +81,20 @@
         );
 
         let isLoginMode = true;
-        let despesasDoMes = [];
-        let despesasFiltradas = [];
         let userId = null;
-        let itensParaImportar = [];
 
-        document.getElementById('filtroMes').value = new Date().toISOString().substring(0, 7);
-
-        // Dark mode persistente
-        if (localStorage.getItem('darkMode') === 'true') {
-            document.body.classList.add('dark');
-        }
-
-        function toggleDarkMode() {
-            document.body.classList.toggle('dark');
-            localStorage.setItem('darkMode', document.body.classList.contains('dark'));
-        }
+        // Listener de mudança de autenticação
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log('Auth state mudou:', event, session);
+            if (session?.user) {
+                userId = session.user.id;
+                console.log('Usuário logado - ID:', userId);
+                entrarNoApp();
+            } else {
+                userId = null;
+                console.log('Sem sessão ativa');
+            }
+        });
 
         function togglePassword() {
             const input = document.getElementById('u_pass');
@@ -211,66 +103,27 @@
             icon.textContent = input.type === 'password' ? '👁️' : '🙈';
         }
 
-        function toggleFixaOptions() {
-            const isFixa = document.getElementById('checkFixa').checked;
-            document.getElementById('parcelasOptions').classList.toggle('hidden', isFixa);
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark');
         }
 
-        function avisar(msg, tipo = 'info') {
-            const cores = { erro: 'bg-rose-600', sucesso: 'bg-emerald-600', info: 'bg-blue-600' };
-            const toast = document.createElement('div');
-            toast.className = `fixed bottom-6 right-6 ${cores[tipo]} text-white px-6 py-4 rounded-2xl shadow-2xl z-[200] font-bold text-sm toast-anim`;
-            toast.textContent = msg;
-            document.body.appendChild(toast);
-            setTimeout(() => toast.remove(), 3000);
+        function alternarAuth() {
+            isLoginMode = !isLoginMode;
+            document.getElementById('authTitulo').textContent = isLoginMode ? 'Financeiro Pro' : 'Criar Conta';
         }
-
-        function obterIcone(categoria) {
-            const icons = {
-                Energia: '<i class="fas fa-bolt"></i>',
-                Água: '<i class="fas fa-tint"></i>',
-                Internet: '<i class="fas fa-wifi"></i>',
-                Aluguel: '<i class="fas fa-home"></i>',
-                Mercado: '<i class="fas fa-shopping-cart"></i>',
-                Outros: '<i class="fas fa-money-bill"></i>'
-            };
-            return icons[categoria] || '<i class="fas fa-question"></i>';
-        }
-
-        function formatarValor(input) {
-            let v = input.value.replace(/\D/g, '');
-            v = (v / 100).toFixed(2).replace('.', ',').replace(/(\d)(?=(\d{3})+(?!\d))/g, '$1.');
-            input.value = v ? `R$ ${v}` : '';
-        }
-
-        function extrairValor(v) {
-            return parseFloat(v.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) || 0;
-        }
-
-        // Listener de autenticação
-        supabase.auth.onAuthStateChange(async (event, session) => {
-            console.log("Auth state mudou:", event, session);
-            if (session?.user) {
-                userId = session.user.id;
-                console.log("Usuário autenticado com ID:", userId);
-                entrarNoApp();
-            } else {
-                userId = null;
-            }
-        });
 
         async function gerenciarAuth() {
             const email = document.getElementById('u_mail').value.trim();
             const password = document.getElementById('u_pass').value;
 
-            console.log("Tentando autenticação:", { email, modo: isLoginMode ? "Login" : "Cadastro" });
+            console.log('Botão clicado - dados:', { email, modo: isLoginMode ? 'Login' : 'Cadastro' });
 
             if (!email || password.length < 6) {
-                avisar("Preencha e-mail e senha válidos", "erro");
+                avisar('Preencha e-mail e senha válidos (mínimo 6 caracteres)', 'erro');
                 return;
             }
 
-            avisar("Autenticando...", "info");
+            avisar('Tentando autenticar...', 'info');
 
             try {
                 let result;
@@ -282,67 +135,57 @@
 
                 const { data, error } = result;
 
-                console.log("Resposta Supabase:", { data, error });
+                console.log('Resposta completa do Supabase:', { data, error });
 
                 if (error) {
-                    console.error("Erro de autenticação:", error.message, error);
-                    avisar(error.message || "Falha na autenticação", "erro");
+                    console.error('Erro do Supabase:', error.message, error);
+                    avisar(error.message || 'Falha na autenticação. Verifique email/senha.', 'erro');
                     return;
                 }
 
-                console.log("Autenticação bem-sucedida", data);
+                console.log('Sucesso na autenticação:', data);
 
                 // Verifica sessão imediatamente
                 const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
                 if (sessionErr) {
-                    console.error("Erro ao verificar sessão:", sessionErr);
-                    avisar("Problema ao confirmar login", "erro");
-                } else if (sessionData.session) {
+                    console.error('Erro ao verificar sessão:', sessionErr);
+                    avisar('Problema ao confirmar login', 'erro');
+                } else if (sessionData?.session) {
                     userId = sessionData.session.user.id;
-                    console.log("Sessão confirmada. Entrando no app.");
+                    console.log('Sessão confirmada. Entrando no app.');
+                    avisar('Login realizado com sucesso!', 'sucesso');
                     entrarNoApp();
                 } else {
-                    avisar("Sessão não encontrada após login. Tente novamente.", "erro");
+                    avisar('Sessão não encontrada após login. Tente novamente.', 'erro');
                 }
 
             } catch (err) {
-                console.error("Exceção na autenticação:", err);
-                avisar("Erro de conexão. Verifique internet ou tente novamente.", "erro");
+                console.error('Exceção inesperada:', err);
+                avisar('Erro de conexão ou servidor. Verifique sua internet.', 'erro');
             }
         }
 
         function entrarNoApp() {
-            console.log("Entrando no aplicativo - userId:", userId);
+            console.log('Chamando entrarNoApp - ocultando auth');
             document.getElementById('telaAuth').classList.add('hidden');
             document.getElementById('app').classList.remove('hidden');
-            buscarDados();
+            avisar('Bem-vindo ao Financeiro Pro!', 'sucesso');
         }
 
-        function alternarAuth() {
-            isLoginMode = !isLoginMode;
-            document.getElementById('authTitulo').textContent = isLoginMode ? 'Financeiro Pro' : 'Criar Conta';
-            document.getElementById('btnPrincipal').textContent = isLoginMode ? 'Entrar' : 'Criar Conta';
+        function avisar(msg, tipo = 'info') {
+            const cores = { erro: 'bg-rose-600', sucesso: 'bg-emerald-600', info: 'bg-blue-600' };
+            const toast = document.createElement('div');
+            toast.className = `fixed bottom-6 right-6 ${cores[tipo]} text-white px-6 py-4 rounded-2xl shadow-2xl z-[200] font-bold text-sm toast-anim`;
+            toast.textContent = msg;
+            document.body.appendChild(toast);
+            setTimeout(() => toast.remove(), 4000);
         }
 
+        // Logout (para teste)
         async function logout() {
             await supabase.auth.signOut();
-            localStorage.clear();
             location.reload();
         }
-
-        // =============================================
-        // Aqui você deve manter/colocar as demais funções da aplicação
-        // (buscarDados, adicionarFixasAutomaticamente, salvarLancamento, renderizar, etc.)
-        // =============================================
-
-        // Exemplo mínimo para o app abrir (substitua pelo seu código completo das funcionalidades)
-        async function buscarDados() {
-            if (!userId) return avisar("Usuário não autenticado", "erro");
-            // Sua lógica de busca aqui...
-            avisar("Dados carregados (exemplo)", "sucesso");
-        }
-
-        // ... insira aqui todas as outras funções que você já tinha ...
     </script>
 </body>
 </html>
