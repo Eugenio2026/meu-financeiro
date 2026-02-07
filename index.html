@@ -3,17 +3,26 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Financeiro Pro - Versão Final Corrigida</title>
+    <title>Financeiro Pro - Versão Melhorada</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <style>
         .dark { background-color: #0f172a; color: #f8fafc; }
         .dark .bg-white { background-color: #1e293b; color: #f1f5f9; border-color: #334155; }
+        .dark .bg-slate-100 { background-color: #0f172a; }
+        .dark .bg-slate-50 { background-color: #334155; }
+        .dark .text-slate-800 { color: #f1f5f9; }
+        .dark .text-slate-400 { color: #94a3b8; }
+        .dark .border-slate-200 { border-color: #334155; }
         #telaAuth { background: linear-gradient(135deg, #1e293b 0%, #0f172a 100%); }
         .fixo-tag { background-color: #eff6ff; color: #1d4ed8; font-size: 10px; padding: 2px 8px; border-radius: 999px; font-weight: 800; border: 1px solid #dbeafe; text-transform: uppercase; }
+        .dark .fixo-tag { background-color: #1e40af; color: #bfdbfe; border-color: #1e40af; }
         .hidden { display: none !important; }
         @keyframes slideUp { from { transform: translateY(100%); opacity: 0; } to { transform: translateY(0); opacity: 1; } }
         .toast-anim { animation: slideUp 0.3s ease-out; }
+        .password-container { position: relative; }
+        .password-container input { padding-right: 2.5rem; }
+        .password-toggle { position: absolute; right: 1rem; top: 50%; transform: translateY(-50%); cursor: pointer; }
     </style>
 </head>
 <body class="bg-slate-100 min-h-screen p-4 font-sans" id="corpo">
@@ -23,8 +32,11 @@
             <h2 id="authTitulo" class="text-2xl font-black mb-6 text-center text-slate-800">Financeiro Pro</h2>
             <form id="camposAuth" onsubmit="return false;" autocomplete="off" class="space-y-4">
                 <input style="display:none" type="text" name="fake_user"/><input style="display:none" type="password" name="fake_password"/>
-                <input type="email" id="u_mail" placeholder="E-mail" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" autocomplete="new-password">
-                <input type="text" id="u_pass" placeholder="Senha" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" autocomplete="new-password" onfocus="this.type='password'">
+                <input type="email" id="u_mail" placeholder="E-mail" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" autocomplete="email">
+                <div class="password-container">
+                    <input type="password" id="u_pass" placeholder="Senha" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50" autocomplete="new-password">
+                    <span class="password-toggle text-slate-400" onclick="togglePassword()">👁️</span>
+                </div>
                 <button onclick="gerenciarAuth()" id="btnPrincipal" class="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase shadow-lg">Entrar</button>
                 <button type="button" onclick="alternarAuth()" id="btnTroca" class="w-full text-xs font-bold text-slate-400 uppercase mt-2">Criar conta / Login</button>
             </form>
@@ -38,7 +50,10 @@
     <div id="app" class="max-w-2xl mx-auto space-y-6 hidden">
         <div class="bg-white rounded-2xl shadow-sm p-6 border-b-4 border-blue-600 flex justify-between items-center">
             <h1 class="text-2xl font-black text-slate-800">Minhas Contas</h1>
-            <button onclick="logout()" class="text-rose-500 font-bold text-xs uppercase border border-rose-100 px-3 py-2 rounded-lg">Sair</button>
+            <div class="flex items-center gap-4">
+                <button onclick="toggleDarkMode()" class="text-slate-500 font-bold text-xs uppercase border border-slate-100 px-3 py-2 rounded-lg">🌙</button>
+                <button onclick="logout()" class="text-rose-500 font-bold text-xs uppercase border border-rose-100 px-3 py-2 rounded-lg">Sair</button>
+            </div>
         </div>
 
         <div class="bg-white p-6 rounded-2xl shadow-sm border border-slate-200 space-y-4">
@@ -51,7 +66,7 @@
             </div>
         </div>
 
-        <div class="grid grid-cols-2 gap-4">
+        <div class="grid grid-cols-3 gap-4">
             <div class="bg-white p-5 rounded-2xl border text-center">
                 <p class="text-[10px] text-slate-400 font-bold uppercase">Total Geral</p>
                 <p id="totalGeral" class="text-xl font-black">R$ 0,00</p>
@@ -59,6 +74,10 @@
             <div class="bg-emerald-500 p-5 rounded-2xl text-white text-center">
                 <p class="text-[10px] font-bold uppercase opacity-80">Total Pago</p>
                 <p id="totalPago" class="text-xl font-black">R$ 0,00</p>
+            </div>
+            <div class="bg-rose-500 p-5 rounded-2xl text-white text-center">
+                <p class="text-[10px] font-bold uppercase opacity-80">Restante</p>
+                <p id="totalRestante" class="text-xl font-black">R$ 0,00</p>
             </div>
         </div>
 
@@ -70,7 +89,16 @@
                 </label>
             </div>
             <input type="hidden" id="editId">
-            <div class="grid grid-cols-1 md:grid-cols-4 gap-3">
+            <div class="grid grid-cols-1 md:grid-cols-5 gap-3">
+                <select id="categoria" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
+                    <option value="">Selecione Categoria</option>
+                    <option value="Energia">⚡ Energia</option>
+                    <option value="Água">💧 Água</option>
+                    <option value="Internet">🌐 Internet</option>
+                    <option value="Aluguel">🏠 Aluguel</option>
+                    <option value="Mercado">🛒 Mercado</option>
+                    <option value="Outros">💰 Outros</option>
+                </select>
                 <input type="text" id="nome" placeholder="Descrição" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
                 <input type="text" id="valor" placeholder="Valor (ex: 123.45)" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50" oninput="formatarValor(this)">
                 <input type="number" id="vencimentoDia" placeholder="Dia" class="border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50">
@@ -92,6 +120,28 @@
         let userId = null;
         document.getElementById('filtroMes').value = new Date().toISOString().substring(0, 7);
 
+        // Verificar preferência de dark mode
+        if (localStorage.getItem('darkMode') === 'true') {
+            document.body.classList.add('dark');
+        }
+
+        function toggleDarkMode() {
+            document.body.classList.toggle('dark');
+            localStorage.setItem('darkMode', document.body.classList.contains('dark'));
+        }
+
+        function togglePassword() {
+            const passInput = document.getElementById('u_pass');
+            const toggleIcon = document.querySelector('.password-toggle');
+            if (passInput.type === 'password') {
+                passInput.type = 'text';
+                toggleIcon.textContent = '🙈';
+            } else {
+                passInput.type = 'password';
+                toggleIcon.textContent = '👁️';
+            }
+        }
+
         function avisar(msg, tipo = 'info') {
             const cores = { erro: 'bg-rose-600', sucesso: 'bg-emerald-600', info: 'bg-blue-600' };
             const toast = document.createElement('div');
@@ -101,7 +151,19 @@
             setTimeout(() => { toast.remove(); }, 3000);
         }
 
-        function obterIcone(nome) {
+        function obterIcone(categoria, nome) {
+            const icons = {
+                "Energia": "⚡",
+                "Água": "💧",
+                "Internet": "🌐",
+                "Aluguel": "🏠",
+                "Mercado": "🛒",
+                "Outros": "💰"
+            };
+            return icons[categoria] || obterIconePorNome(nome);
+        }
+
+        function obterIconePorNome(nome) {
             const n = nome.toLowerCase();
             if(n.includes("luz") || n.includes("ener")) return "⚡";
             if(n.includes("agua")) return "💧";
@@ -136,10 +198,17 @@
         async function gerenciarAuth() {
             const email = document.getElementById('u_mail').value;
             const password = document.getElementById('u_pass').value;
+            if (!validateEmail(email)) return avisar("E-mail inválido", "erro");
+            if (password.length < 8) return avisar("Senha deve ter pelo menos 8 caracteres", "erro");
             const { error } = isLoginMode 
                 ? await supabaseClient.auth.signInWithPassword({ email, password })
                 : await supabaseClient.auth.signUp({ email, password });
             if (error) avisar(error.message, "erro");
+        }
+
+        function validateEmail(email) {
+            const re = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+            return re.test(email);
         }
 
         function entrarNoApp() {
@@ -192,7 +261,8 @@
                     fixa: true,
                     paga: false,
                     vencimento: `${mesAtual}-${dia}`,
-                    user_id: userId
+                    user_id: userId,
+                    categoria: ultimaFixa.categoria || '' // Adicionando categoria
                 }]);
             }
             avisar("Despesas fixas adicionadas automaticamente!", "sucesso");
@@ -226,10 +296,11 @@
                 await supabaseClient.from('despesas').insert([{
                     nome: item.nome,
                     valor: item.valor,
-                    fixa: false, // Não fixa
+                    fixa: false,
                     paga: false,
                     vencimento: `${mesAtual}-${dia}`,
-                    user_id: userId
+                    user_id: userId,
+                    categoria: item.categoria || ''
                 }]);
             }
             avisar("Despesas do mês anterior importadas!", "sucesso");
@@ -248,7 +319,7 @@
                 div.className = `p-4 rounded-2xl bg-white border flex justify-between items-center ${item.paga ? 'opacity-50 grayscale' : 'shadow-sm'} ${isAtrasada ? 'border-rose-600' : ''}`;
                 div.innerHTML = `
                     <div onclick="editarItem(${idx})" class="cursor-pointer flex items-center gap-3">
-                        <span class="text-xl">${obterIcone(item.nome)}</span>
+                        <span class="text-xl">${obterIcone(item.categoria, item.nome)}</span>
                         <div>
                             <p class="font-bold text-slate-800">${item.nome} ${item.fixa ? '<span class="fixo-tag">Fixo</span>' : ''}</p>
                             <p class="text-[10px] font-bold text-slate-400 uppercase">Dia ${item.vencimento.split('-')[2]} • R$ ${item.valor.toFixed(2)}</p>
@@ -263,6 +334,7 @@
             });
             document.getElementById('totalGeral').innerText = `R$ ${tG.toFixed(2)}`;
             document.getElementById('totalPago').innerText = `R$ ${tP.toFixed(2)}`;
+            document.getElementById('totalRestante').innerText = `R$ ${(tG - tP).toFixed(2)}`;
         }
 
         async function salvarLancamento() {
@@ -271,12 +343,14 @@
             const dia = parseInt(document.getElementById('vencimentoDia').value);
             const valorStr = document.getElementById('valor').value;
             const valor = extrairValorFormatado(valorStr);
+            const categoria = document.getElementById('categoria').value;
             const payload = {
                 nome: document.getElementById('nome').value,
                 valor: valor,
                 vencimento: `${document.getElementById('filtroMes').value}-${dia.toString().padStart(2, '0')}`,
                 fixa: document.getElementById('checkFixa').checked,
-                user_id: userId
+                user_id: userId,
+                categoria: categoria
             };
             if (!payload.nome) return avisar("Descrição obrigatória", "erro");
             if (dia < 1 || dia > 31) return avisar("Dia inválido (1–31)", "erro");
@@ -306,6 +380,7 @@
             document.getElementById('valor').value = `R$ ${item.valor.toFixed(2).replace('.', ',')}`;
             document.getElementById('vencimentoDia').value = item.vencimento.split('-')[2];
             document.getElementById('checkFixa').checked = item.fixa;
+            document.getElementById('categoria').value = item.categoria || '';
             document.getElementById('btnCancelar').classList.remove('hidden');
         }
 
@@ -315,6 +390,7 @@
             document.getElementById('valor').value = '';
             document.getElementById('vencimentoDia').value = '';
             document.getElementById('checkFixa').checked = false;
+            document.getElementById('categoria').value = '';
             document.getElementById('btnCancelar').classList.add('hidden');
         }
     </script>
