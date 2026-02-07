@@ -40,20 +40,38 @@
         <div class="bg-white dark:bg-gray-800 p-8 rounded-3xl shadow-2xl w-full max-w-sm">
             <h2 id="authTitulo" class="text-2xl font-black mb-6 text-center text-slate-800 dark:text-slate-100">Financeiro Pro</h2>
             <form id="camposAuth" onsubmit="return false;" autocomplete="off" class="space-y-4">
-                <input type="email" id="u_mail" placeholder="E-mail" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-gray-700 dark:text-white" autocomplete="email">
+                <!-- Campos ocultos para evitar autofill do navegador -->
+                <input type="text" name="fakeuser" style="display:none;" autocomplete="off">
+                <input type="password" name="fakepass" style="display:none;" autocomplete="off">
+
+                <input 
+                    type="email" 
+                    id="u_mail" 
+                    placeholder="E-mail" 
+                    class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-gray-700 dark:text-white" 
+                    autocomplete="off" 
+                    autocorrect="off" 
+                    autocapitalize="off" 
+                    spellcheck="false"
+                >
                 <div class="password-container">
-                    <input type="password" id="u_pass" placeholder="Senha" class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-gray-700 dark:text-white" autocomplete="new-password">
+                    <input 
+                        type="password" 
+                        id="u_pass" 
+                        placeholder="Senha" 
+                        class="w-full border rounded-xl px-4 py-3 outline-none focus:ring-2 focus:ring-blue-500 bg-slate-50 dark:bg-gray-700 dark:text-white" 
+                        autocomplete="new-password"
+                    >
                     <span class="password-toggle text-slate-400 dark:text-slate-300" onclick="togglePassword()">👁️</span>
                 </div>
-                <button type="button" onclick="gerenciarAuth()" id="btnPrincipal" class="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase shadow-lg hover:bg-blue-700 transition">Entrar</button>
-                <button type="button" onclick="alternarAuth()" id="btnTroca" class="w-full text-xs font-bold text-slate-400 dark:text-slate-300 uppercase mt-2">Criar conta / Login</button>
+                <button type="button" onclick="gerenciarAuth()" class="w-full bg-blue-600 text-white py-4 rounded-xl font-black uppercase shadow-lg hover:bg-blue-700 transition">Entrar</button>
+                <button type="button" onclick="alternarAuth()" class="w-full text-xs font-bold text-slate-400 dark:text-slate-300 uppercase mt-2">Criar conta / Login</button>
             </form>
         </div>
     </div>
 
     <!-- Conteúdo principal -->
     <div id="app" class="max-w-2xl mx-auto space-y-6 hidden">
-        <!-- Cabeçalho -->
         <div class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border-b-4 border-blue-600 flex justify-between items-center">
             <h1 class="text-2xl font-black text-slate-800 dark:text-slate-100">Minhas Contas</h1>
             <div class="flex items-center gap-4">
@@ -62,7 +80,6 @@
             </div>
         </div>
 
-        <!-- Filtro mês + importação -->
         <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700 space-y-4">
             <div class="flex flex-col md:flex-row gap-4 items-end">
                 <div class="flex-1 w-full">
@@ -73,7 +90,6 @@
             </div>
         </div>
 
-        <!-- Cards de totais -->
         <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div class="bg-white dark:bg-gray-800 p-5 rounded-2xl border dark:border-gray-700 text-center">
                 <p class="text-[10px] text-slate-400 dark:text-slate-400 font-bold uppercase">Total Geral</p>
@@ -95,7 +111,6 @@
             </div>
         </div>
 
-        <!-- Formulário de lançamento -->
         <div id="boxForm" class="bg-white dark:bg-gray-800 rounded-2xl shadow-sm p-6 border border-slate-200 dark:border-gray-700">
             <div class="flex justify-between items-center mb-4">
                 <h2 class="font-bold uppercase text-xs text-slate-400 dark:text-slate-400">Novo Lançamento</h2>
@@ -126,7 +141,6 @@
             <button onclick="cancelarEdicao()" id="btnCancelar" class="hidden w-full mt-2 text-rose-500 dark:text-rose-400 text-[10px] font-bold uppercase">Cancelar Edição</button>
         </div>
 
-        <!-- Busca e ações -->
         <div class="bg-white dark:bg-gray-800 p-6 rounded-2xl shadow-sm border border-slate-200 dark:border-gray-700">
             <div class="flex flex-col md:flex-row gap-4">
                 <input type="text" id="buscaDespesa" placeholder="Buscar por nome..." class="flex-1 border rounded-xl px-4 py-3 text-sm outline-none bg-slate-50 dark:bg-gray-700 dark:text-white" oninput="filtrarLista()">
@@ -180,7 +194,7 @@
 
         document.getElementById('filtroMes').value = new Date().toISOString().substring(0, 7);
 
-        // Dark mode
+        // Dark mode persistente
         if (localStorage.getItem('darkMode') === 'true') {
             document.body.classList.add('dark');
         }
@@ -211,7 +225,6 @@
             setTimeout(() => toast.remove(), 3000);
         }
 
-        // Ícones por categoria
         function obterIcone(categoria) {
             const icons = {
                 Energia: '<i class="fas fa-bolt"></i>',
@@ -234,11 +247,12 @@
             return parseFloat(v.replace('R$ ', '').replace(/\./g, '').replace(',', '.')) || 0;
         }
 
-        // Listener de mudança de estado de autenticação
-        supabase.auth.onAuthStateChange((event, session) => {
-            console.log('Auth state mudou:', event, session);
+        // Listener de autenticação
+        supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth state mudou:", event, session);
             if (session?.user) {
                 userId = session.user.id;
+                console.log("Usuário autenticado com ID:", userId);
                 entrarNoApp();
             } else {
                 userId = null;
@@ -249,15 +263,17 @@
             const email = document.getElementById('u_mail').value.trim();
             const password = document.getElementById('u_pass').value;
 
-            if (!email || !password) {
-                avisar("Preencha e-mail e senha", "erro");
+            console.log("Tentando autenticação:", { email, modo: isLoginMode ? "Login" : "Cadastro" });
+
+            if (!email || password.length < 6) {
+                avisar("Preencha e-mail e senha válidos", "erro");
                 return;
             }
 
-            console.log("Tentando autenticação:", { email, modo: isLoginMode ? "Login" : "Cadastro" });
+            avisar("Autenticando...", "info");
 
-            let result;
             try {
+                let result;
                 if (isLoginMode) {
                     result = await supabase.auth.signInWithPassword({ email, password });
                 } else {
@@ -269,32 +285,34 @@
                 console.log("Resposta Supabase:", { data, error });
 
                 if (error) {
-                    console.error("Erro de autenticação:", error.message);
-                    avisar(error.message || "Erro ao autenticar", "erro");
+                    console.error("Erro de autenticação:", error.message, error);
+                    avisar(error.message || "Falha na autenticação", "erro");
                     return;
                 }
 
-                // Sucesso
                 console.log("Autenticação bem-sucedida", data);
-                avisar(isLoginMode ? "Login realizado!" : "Conta criada! Verifique seu email.", "sucesso");
 
-                // Força atualização da sessão
-                const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
-                if (sessionError) {
-                    console.error("Erro ao obter sessão:", sessionError);
+                // Verifica sessão imediatamente
+                const { data: sessionData, error: sessionErr } = await supabase.auth.getSession();
+                if (sessionErr) {
+                    console.error("Erro ao verificar sessão:", sessionErr);
+                    avisar("Problema ao confirmar login", "erro");
                 } else if (sessionData.session) {
                     userId = sessionData.session.user.id;
+                    console.log("Sessão confirmada. Entrando no app.");
                     entrarNoApp();
+                } else {
+                    avisar("Sessão não encontrada após login. Tente novamente.", "erro");
                 }
 
             } catch (err) {
                 console.error("Exceção na autenticação:", err);
-                avisar("Erro inesperado. Veja o console.", "erro");
+                avisar("Erro de conexão. Verifique internet ou tente novamente.", "erro");
             }
         }
 
         function entrarNoApp() {
-            console.log("Entrando no app - userId:", userId);
+            console.log("Entrando no aplicativo - userId:", userId);
             document.getElementById('telaAuth').classList.add('hidden');
             document.getElementById('app').classList.remove('hidden');
             buscarDados();
@@ -312,11 +330,19 @@
             location.reload();
         }
 
-        // ... (o restante do código continua igual: buscarDados, adicionarFixasAutomaticamente, salvarLancamento, renderizar, etc.)
+        // =============================================
+        // Aqui você deve manter/colocar as demais funções da aplicação
+        // (buscarDados, adicionarFixasAutomaticamente, salvarLancamento, renderizar, etc.)
+        // =============================================
 
-        // Para evitar o código ficar enorme demais aqui, o restante das funções (lista, filtros, exportação, etc.) deve ser mantido como na versão anterior.
-        // Se precisar que eu complete alguma parte específica que foi omitida, me avise.
+        // Exemplo mínimo para o app abrir (substitua pelo seu código completo das funcionalidades)
+        async function buscarDados() {
+            if (!userId) return avisar("Usuário não autenticado", "erro");
+            // Sua lógica de busca aqui...
+            avisar("Dados carregados (exemplo)", "sucesso");
+        }
 
+        // ... insira aqui todas as outras funções que você já tinha ...
     </script>
 </body>
 </html>
